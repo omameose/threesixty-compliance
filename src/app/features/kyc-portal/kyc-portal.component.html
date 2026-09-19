@@ -1,0 +1,144 @@
+<div class="min-h-screen bg-ink-50/60 flex flex-col">
+  <header class="h-16 bg-white border-b border-ink-100 flex items-center px-6">
+    <div class="flex items-center gap-2 font-bold" *ngIf="company">
+      <span class="w-8 h-8 rounded-lg flex items-center justify-center text-white overflow-hidden" [style.background]="company.brandColor">
+        <img *ngIf="company.logoUrl" [src]="company.logoUrl" class="w-full h-full object-cover"/>
+        <app-icon *ngIf="!company.logoUrl" name="building" [size]="16"></app-icon>
+      </span>
+      {{ company.name }}
+    </div>
+    <span class="ml-auto text-xs text-ink-400 flex items-center gap-1">
+      <app-icon name="shield" [size]="13"></app-icon> Secured by 360Compliance
+    </span>
+  </header>
+
+  <main class="flex-1 flex items-start justify-center px-4 py-10">
+    <div class="w-full max-w-xl" *ngIf="!loading">
+
+      <!-- AUTH STEP -->
+      <div *ngIf="step() === 'auth'" class="card p-8 fade-in">
+        <div class="text-center mb-6">
+          <div class="w-14 h-14 rounded-2xl mx-auto mb-3 flex items-center justify-center text-white overflow-hidden" [style.background]="company?.brandColor">
+            <img *ngIf="company?.logoUrl" [src]="company?.logoUrl" class="w-full h-full object-cover"/>
+            <app-icon *ngIf="!company?.logoUrl" name="building" [size]="26"></app-icon>
+          </div>
+          <h1 class="text-xl font-bold text-ink-950">{{ form?.name }}</h1>
+          <p class="muted mt-1">{{ company?.name }} requires you to complete identity verification.</p>
+        </div>
+
+        <div class="space-y-4">
+          <div>
+            <label class="label">Compliance ID</label>
+            <input class="input font-mono" [(ngModel)]="complianceId"/>
+          </div>
+          <div>
+            <label class="label">Email Address</label>
+            <input class="input" type="email" [(ngModel)]="email" placeholder="you@example.com"/>
+          </div>
+          <div>
+            <label class="label">Password</label>
+            <input class="input" type="password" [(ngModel)]="password" placeholder="Sent to your email"/>
+          </div>
+          <button class="btn-primary w-full py-3" [disabled]="authenticating" (click)="startVerification()">
+            {{ authenticating ? 'Verifying...' : 'Continue' }}
+          </button>
+        </div>
+        <p class="text-xs text-ink-400 text-center mt-5">Don't have a password? Check your email for the invitation from {{ company?.name }}, or contact {{ company?.supportEmail }}.</p>
+      </div>
+
+      <!-- FORM STEP -->
+      <div *ngIf="step() === 'form' && form" class="fade-in">
+        <div class="mb-5">
+          <div class="flex items-center justify-between text-sm mb-2">
+            <span class="font-medium text-ink-700">Section {{ sectionIndex() + 1 }} of {{ form.sections.length }}</span>
+            <span class="text-ink-400">{{ progressPercent() }}% complete</span>
+          </div>
+          <div class="w-full h-2 bg-ink-200 rounded-full overflow-hidden">
+            <div class="h-full rounded-full transition-all" [style.width.%]="progressPercent()" [style.background]="company?.brandColor || '#128a4d'"></div>
+          </div>
+        </div>
+
+        <div class="card p-8" *ngIf="currentSection() as section">
+          <h2 class="text-lg font-bold text-ink-950 mb-1">{{ section.title }}</h2>
+          <p class="muted mb-6" *ngIf="section.description">{{ section.description }}</p>
+
+          <div class="space-y-5">
+            <div *ngFor="let q of section.questions">
+              <label class="label">{{ q.label }} <span class="text-red-500" *ngIf="q.required">*</span></label>
+              <p class="text-xs text-ink-400 mb-1.5" *ngIf="q.helpText">{{ q.helpText }}</p>
+
+              <input *ngIf="['short_text','email','phone','number'].includes(q.type)" class="input" [type]="q.type === 'number' ? 'number' : 'text'" [(ngModel)]="answers[q.id]" [placeholder]="q.placeholder || ''"/>
+              <input *ngIf="q.type === 'date'" class="input" type="date" [(ngModel)]="answers[q.id]"/>
+              <textarea *ngIf="q.type === 'long_text'" class="input" rows="3" [(ngModel)]="answers[q.id]" [placeholder]="q.placeholder || ''"></textarea>
+              <input *ngIf="q.type === 'address'" class="input" [(ngModel)]="answers[q.id]" placeholder="Street, city, state, postal code"/>
+
+              <select *ngIf="q.type === 'dropdown'" class="input" [(ngModel)]="answers[q.id]">
+                <option value="" disabled selected>Select an option</option>
+                <option *ngFor="let o of q.options" [value]="o.label">{{ o.label }}</option>
+              </select>
+
+              <select *ngIf="q.type === 'country'" class="input" [(ngModel)]="answers[q.id]">
+                <option value="" disabled selected>Select your country</option>
+                <option>Nigeria</option><option>Ghana</option><option>Kenya</option><option>South Africa</option>
+                <option>United Kingdom</option><option>United States</option><option>United Arab Emirates</option>
+              </select>
+
+              <div *ngIf="q.type === 'radio'" class="flex gap-5 flex-wrap">
+                <label class="flex items-center gap-2 text-sm text-ink-700" *ngFor="let o of q.options">
+                  <input type="radio" [name]="q.id" [value]="o.label" [(ngModel)]="answers[q.id]"/> {{ o.label }}
+                </label>
+              </div>
+
+              <div *ngIf="q.type === 'checkbox'" class="flex gap-5 flex-wrap">
+                <label class="flex items-center gap-2 text-sm text-ink-700" *ngFor="let o of q.options">
+                  <input type="checkbox"/> {{ o.label }}
+                </label>
+              </div>
+
+              <div *ngIf="q.type === 'file_upload' || q.type === 'id_document'">
+                <label class="border-2 border-dashed border-ink-200 rounded-lg p-5 text-center text-ink-400 hover:border-brand-400 transition cursor-pointer flex flex-col items-center gap-1 block">
+                  <app-icon name="upload" [size]="20"></app-icon>
+                  <span class="text-sm">{{ fileNames[q.id] || 'Click to upload (' + (q.acceptedFileTypes || 'any file') + ')' }}</span>
+                  <input type="file" class="hidden" (change)="onFileChange($event, q.id)"/>
+                </label>
+              </div>
+
+              <div *ngIf="q.type === 'signature'" class="border-2 border-dashed border-ink-200 rounded-lg h-24 flex items-center justify-center text-ink-400 text-sm">
+                Sign here
+              </div>
+            </div>
+          </div>
+
+          <div class="flex justify-between mt-8">
+            <button class="btn-secondary" [disabled]="sectionIndex() === 0" (click)="back()">
+              <app-icon name="arrow-left" [size]="15"></app-icon> Back
+            </button>
+            <button class="btn-primary" [disabled]="submitting" (click)="next()">
+              <span *ngIf="!isLastSection()">Continue</span>
+              <span *ngIf="isLastSection()">{{ submitting ? 'Submitting...' : 'Submit for Review' }}</span>
+              <app-icon name="arrow-right" [size]="15" *ngIf="!isLastSection()"></app-icon>
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- COMPLETE STEP -->
+      <div *ngIf="step() === 'complete'" class="card p-10 text-center fade-in">
+        <div class="w-16 h-16 rounded-2xl bg-brand-50 text-brand-600 flex items-center justify-center mx-auto mb-4">
+          <app-icon name="check-circle" [size]="32"></app-icon>
+        </div>
+        <h2 class="text-xl font-bold text-ink-950 mb-2">Verification Submitted</h2>
+        <p class="muted max-w-sm mx-auto">Thanks! Your information has been submitted to {{ company?.name }} for review. You'll receive an email once a decision has been made.</p>
+        <div class="mt-6 inline-flex items-center gap-2 bg-ink-50 rounded-lg px-4 py-2 text-xs text-ink-500 font-mono">
+          Compliance ID: {{ complianceId }}
+        </div>
+      </div>
+    </div>
+
+    <div *ngIf="loading" class="text-ink-400 text-sm">Loading verification form...</div>
+  </main>
+
+  <footer class="text-center text-xs text-ink-400 py-6">
+    &copy; 2026 360Compliance. This verification is securely processed on behalf of {{ company?.name }}.
+  </footer>
+</div>

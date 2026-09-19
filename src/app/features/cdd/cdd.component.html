@@ -1,0 +1,95 @@
+<app-page-header title="Customer Due Diligence" subtitle="Dynamic CDD checklists collecting identity, occupation, purpose of account and source of funds/wealth information.">
+</app-page-header>
+
+<div class="fixed bottom-6 right-6 z-40 bg-ink-900 text-white text-sm px-4 py-3 rounded-lg shadow-lg fade-in" *ngIf="toast()">{{ toast() }}</div>
+
+<div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6" *ngIf="!loading">
+  <div class="card p-5"><p class="muted mb-1">In Progress</p><p class="text-2xl font-bold text-blue-600">{{ countByStatus('in_progress') }}</p></div>
+  <div class="card p-5"><p class="muted mb-1">Pending Review</p><p class="text-2xl font-bold text-amber-600">{{ countByStatus('pending_review') }}</p></div>
+  <div class="card p-5"><p class="muted mb-1">Completed</p><p class="text-2xl font-bold text-brand-600">{{ countByStatus('completed') }}</p></div>
+  <div class="card p-5"><p class="muted mb-1">Avg. Completion</p><p class="text-2xl font-bold text-ink-900">{{ avgCompletion() }}%</p></div>
+</div>
+
+<div class="grid lg:grid-cols-5 gap-5" *ngIf="!loading">
+  <div class="lg:col-span-3 space-y-4">
+    <div class="flex flex-col sm:flex-row gap-3">
+      <div class="relative flex-1">
+        <app-icon name="search" [size]="16" class="absolute left-3 top-1/2 -translate-y-1/2 text-ink-400"></app-icon>
+        <input class="input pl-9" placeholder="Search customers..." [(ngModel)]="query"/>
+      </div>
+      <select class="input !w-auto" [(ngModel)]="statusFilter">
+        <option value="all">All statuses</option>
+        <option value="in_progress">In Progress</option>
+        <option value="pending_review">Pending Review</option>
+        <option value="completed">Completed</option>
+      </select>
+    </div>
+
+    <div class="card overflow-x-auto">
+      <table class="table">
+        <thead><tr><th>Customer</th><th>Type</th><th>Completion</th><th>Status</th></tr></thead>
+        <tbody>
+          <tr *ngFor="let c of filtered()" class="cursor-pointer" [class.bg-brand-50]="selected()?.id === c.id" (click)="select(c)">
+            <td>
+              <div class="flex items-center gap-3">
+                <app-avatar [name]="c.customerName" [size]="30"></app-avatar>
+                <span class="font-medium text-ink-900">{{ c.customerName }}</span>
+              </div>
+            </td>
+            <td><span class="badge-blue">{{ c.customerType }}</span></td>
+            <td>
+              <div class="flex items-center gap-2 w-28">
+                <div class="flex-1 h-1.5 bg-ink-100 rounded-full overflow-hidden">
+                  <div class="h-full bg-brand-600 rounded-full" [style.width.%]="completionPct(c)"></div>
+                </div>
+                <span class="text-xs text-ink-500">{{ completionPct(c) }}%</span>
+              </div>
+            </td>
+            <td><span [ngClass]="statusBadge(c.status)">{{ c.status.replace('_',' ') }}</span></td>
+          </tr>
+        </tbody>
+      </table>
+      <div *ngIf="!filtered().length" class="py-10 text-center text-sm text-ink-400">No CDD cases match your filters.</div>
+    </div>
+  </div>
+
+  <div class="lg:col-span-2">
+    <div class="card p-5 sticky top-6" *ngIf="selected() as c">
+      <div class="flex items-center gap-3 mb-4">
+        <app-avatar [name]="c.customerName" [size]="36"></app-avatar>
+        <div>
+          <h3 class="font-semibold text-ink-900">{{ c.customerName }}</h3>
+          <p class="text-xs text-ink-400">{{ c.customerType }}</p>
+        </div>
+        <span [ngClass]="statusBadge(c.status)" class="ml-auto">{{ c.status.replace('_',' ') }}</span>
+      </div>
+
+      <p class="text-xs font-semibold uppercase tracking-wide text-ink-400 mb-2">CDD Checklist</p>
+      <div class="space-y-3 mb-4 max-h-80 overflow-y-auto">
+        <div *ngFor="let f of c.fields">
+          <div class="flex items-center justify-between mb-1">
+            <label class="text-sm text-ink-700 flex items-center gap-1.5">
+              <app-icon [name]="f.completed ? 'check-circle' : 'x-circle'" [size]="14" [class.text-brand-600]="f.completed" [class.text-ink-300]="!f.completed"></app-icon>
+              {{ f.label }} <span class="text-red-500" *ngIf="f.required">*</span>
+            </label>
+          </div>
+          <input class="input" [ngModel]="f.value" (change)="updateField(c, f.label, $any($event.target).value)" placeholder="Not yet provided"/>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-2 gap-2 mb-5">
+        <button class="btn-secondary btn-sm justify-center" [disabled]="c.status !== 'in_progress' || completionPct(c) < 100" (click)="submitForReview(c)">Submit for Review</button>
+        <button class="btn-primary btn-sm justify-center" [disabled]="c.status !== 'pending_review'" (click)="approve(c)">Approve</button>
+      </div>
+      <p class="text-xs text-ink-400 mb-4" *ngIf="c.reviewedBy">Reviewed by {{ c.reviewedBy }} on {{ c.reviewedAt }}</p>
+
+      <app-notes-panel [notes]="c.notes" (addNote)="addNote($event)"></app-notes-panel>
+    </div>
+
+    <div class="card" *ngIf="!selected()">
+      <app-empty-state icon="users-check" title="Select a customer" subtitle="Click a row on the left to complete or review their CDD checklist."></app-empty-state>
+    </div>
+  </div>
+</div>
+
+<div *ngIf="loading" class="flex items-center justify-center py-24 text-ink-400">Loading CDD cases...</div>

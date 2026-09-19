@@ -1,0 +1,154 @@
+<app-page-header title="KYB & Beneficial Ownership" subtitle="Trace layered ownership chains and nominee structures to surface the true ultimate beneficial owner.">
+</app-page-header>
+
+<div class="fixed bottom-6 right-6 z-40 bg-ink-900 text-white text-sm px-4 py-3 rounded-lg shadow-lg fade-in" *ngIf="toast()">{{ toast() }}</div>
+
+<div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+  <div class="card p-5"><p class="muted mb-1">Companies On File</p><p class="text-2xl font-bold text-ink-900">{{ companies.length }}</p></div>
+  <div class="card p-5"><p class="muted mb-1">Verified</p><p class="text-2xl font-bold text-brand-600">{{ countByStatus('verified') }}</p></div>
+  <div class="card p-5"><p class="muted mb-1">Review Required</p><p class="text-2xl font-bold text-amber-600">{{ countByStatus('review_required') }}</p></div>
+  <div class="card p-5"><p class="muted mb-1">With Risk Flags</p><p class="text-2xl font-bold text-red-500">{{ flaggedCount() }}</p></div>
+</div>
+
+<div class="relative max-w-sm mb-5" *ngIf="!loading">
+  <app-icon name="search" [size]="16" class="absolute left-3 top-1/2 -translate-y-1/2 text-ink-400"></app-icon>
+  <input class="input pl-9" placeholder="Search by company name or reg. number..." [(ngModel)]="query"/>
+</div>
+
+<div class="card overflow-x-auto mb-6" *ngIf="!loading">
+  <table class="table">
+    <thead><tr><th>Legal Name</th><th>Reg. Number</th><th>Country</th><th>Status</th><th>Verification</th><th></th></tr></thead>
+    <tbody>
+      <tr *ngFor="let c of filtered()" class="cursor-pointer" [class.bg-brand-50]="selected()?.id === c.id" (click)="select(c)">
+        <td class="font-medium text-ink-900">{{ c.legalName }}</td>
+        <td class="font-mono text-xs text-ink-600">{{ c.registrationNumber }}</td>
+        <td class="text-sm text-ink-600">{{ c.country }}</td>
+        <td><span class="badge-gray">{{ c.status }}</span></td>
+        <td><span [ngClass]="statusBadge(c.verificationStatus)">{{ c.verificationStatus.replace('_',' ') }}</span></td>
+        <td><button class="btn-secondary btn-sm">View</button></td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<div *ngIf="loading" class="flex items-center justify-center py-24 text-ink-400">Loading companies...</div>
+
+<ng-container *ngIf="selected() as c">
+  <div class="grid lg:grid-cols-3 gap-6">
+    <div class="lg:col-span-2 space-y-6">
+      <div class="card p-6">
+        <div class="flex items-start justify-between mb-4">
+          <div>
+            <h2 class="text-lg font-bold text-ink-950">{{ c.legalName }}</h2>
+            <p class="muted">{{ c.registrationNumber }} &middot; {{ c.industry }}</p>
+          </div>
+          <span [ngClass]="statusBadge(c.verificationStatus)">{{ c.verificationStatus.replace('_',' ') }}</span>
+        </div>
+        <div class="grid sm:grid-cols-2 gap-4 text-sm">
+          <div><p class="text-ink-400 text-xs">Status</p><p class="font-medium text-ink-800">{{ c.status }}</p></div>
+          <div><p class="text-ink-400 text-xs">Incorporation Date</p><p class="font-medium text-ink-800">{{ c.incorporationDate }}</p></div>
+          <div class="sm:col-span-2"><p class="text-ink-400 text-xs">Registered Address</p><p class="font-medium text-ink-800">{{ c.registeredAddress }}</p></div>
+          <div class="sm:col-span-2"><p class="text-ink-400 text-xs">Data Sources</p><p class="font-medium text-ink-800">{{ c.dataSources.join(', ') }}</p></div>
+        </div>
+      </div>
+
+      <div class="grid sm:grid-cols-2 gap-6">
+        <div class="card p-6">
+          <h3 class="font-semibold text-ink-900 mb-3">Directors</h3>
+          <div class="space-y-2">
+            <div *ngFor="let d of c.directors" class="flex items-center justify-between text-sm py-1.5 border-b border-ink-50 last:border-0">
+              <span class="font-medium text-ink-900">{{ d.name }}</span>
+              <span class="text-ink-500">{{ d.role }}</span>
+            </div>
+            <p class="text-sm text-ink-400" *ngIf="!c.directors.length">No directors on file.</p>
+          </div>
+        </div>
+        <div class="card p-6">
+          <h3 class="font-semibold text-ink-900 mb-3">Shareholders</h3>
+          <div class="space-y-2">
+            <div *ngFor="let s of c.shareholders" class="flex items-center justify-between text-sm py-1.5 border-b border-ink-50 last:border-0">
+              <span class="font-medium text-ink-900">{{ s.name }} <span class="text-ink-400 font-normal">({{ s.type }})</span></span>
+              <span class="text-ink-700 font-semibold">{{ s.ownershipPct }}%</span>
+            </div>
+            <p class="text-sm text-ink-400" *ngIf="!c.shareholders.length">No shareholders on file.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="card p-6">
+        <h3 class="font-semibold text-ink-900 mb-1">Ownership Structure</h3>
+        <p class="muted mb-4">Traced layer by layer from the registered company to the ultimate beneficial owner(s).</p>
+
+        <ng-template #nodeTpl let-node>
+          <div class="flex items-start gap-3 py-2">
+            <div class="w-9 h-9 rounded-lg flex items-center justify-center shrink-0"
+                 [ngClass]="node.type === 'company' ? 'bg-blue-50 text-blue-600' : (node.isUbo ? 'bg-brand-50 text-brand-600' : 'bg-ink-100 text-ink-500')">
+              <app-icon [name]="node.type === 'company' ? 'building' : 'user-check'" [size]="17"></app-icon>
+            </div>
+            <div class="flex-1 min-w-0">
+              <div class="flex flex-wrap items-center gap-2">
+                <span class="font-medium text-ink-900">{{ node.name }}</span>
+                <span class="text-xs text-ink-500" *ngIf="node.ownershipPct != null">{{ node.ownershipPct }}% ownership</span>
+                <span class="badge-green" *ngIf="node.isUbo">UBO</span>
+                <span [ngClass]="flagBadge(node.flag)" *ngIf="node.flag">{{ node.flag }}</span>
+              </div>
+              <div class="pl-4 border-l-2 border-ink-100 mt-1 ml-1" *ngIf="node.children?.length">
+                <ng-container *ngFor="let child of node.children">
+                  <ng-container *ngTemplateOutlet="nodeTpl; context: { $implicit: child }"></ng-container>
+                </ng-container>
+              </div>
+            </div>
+          </div>
+        </ng-template>
+        <ng-container *ngTemplateOutlet="nodeTpl; context: { $implicit: c.ownershipTree }"></ng-container>
+      </div>
+    </div>
+
+    <div class="space-y-6">
+      <div class="card p-5">
+        <h3 class="font-semibold text-ink-900 mb-3">Identified UBOs</h3>
+        <div class="space-y-2 mb-2">
+          <div *ngFor="let u of c.ubos" class="flex items-center justify-between text-sm py-1.5 border-b border-ink-50 last:border-0">
+            <div>
+              <p class="font-medium text-ink-900">{{ u.name }}</p>
+              <p class="text-xs text-ink-400">{{ u.nationality }}</p>
+            </div>
+            <span class="font-semibold text-brand-700">{{ u.effectiveOwnershipPct }}%</span>
+          </div>
+          <p class="text-sm text-amber-600" *ngIf="!c.ubos.length">No UBO identified above the disclosure threshold yet.</p>
+        </div>
+      </div>
+
+      <div class="card p-5" *ngIf="c.riskFlags.length">
+        <h3 class="font-semibold text-ink-900 mb-3 flex items-center gap-1.5"><app-icon name="alert-triangle" [size]="16" class="text-amber-500"></app-icon> Risk Flags</h3>
+        <ul class="space-y-2 text-sm text-ink-600">
+          <li class="flex gap-2" *ngFor="let f of c.riskFlags"><span class="text-amber-500">&bull;</span> {{ f }}</li>
+        </ul>
+      </div>
+
+      <div class="card p-5">
+        <h3 class="font-semibold text-ink-900 mb-3">Verification Decision</h3>
+        <div class="space-y-2">
+          <button class="btn-primary w-full justify-center" [disabled]="c.verificationStatus === 'verified'" (click)="setStatus('verified')">
+            <app-icon name="check-circle" [size]="16"></app-icon> Confirm Verified
+          </button>
+          <button class="btn-secondary w-full justify-center" [disabled]="c.verificationStatus === 'review_required'" (click)="setStatus('review_required')">
+            <app-icon name="info" [size]="16"></app-icon> Request More Info
+          </button>
+          <button class="btn-danger w-full justify-center" [disabled]="c.verificationStatus === 'rejected'" (click)="setStatus('rejected')">
+            <app-icon name="x-circle" [size]="16"></app-icon> Reject
+          </button>
+        </div>
+        <p class="text-xs text-ink-400 mt-3" *ngIf="c.verifiedBy">Verified by {{ c.verifiedBy }} on {{ c.verifiedAt }}</p>
+      </div>
+
+      <div class="card p-5">
+        <app-notes-panel [notes]="c.notes" (addNote)="addNote($event)"></app-notes-panel>
+      </div>
+    </div>
+  </div>
+</ng-container>
+
+<div class="card" *ngIf="!loading && !selected()">
+  <app-empty-state icon="building" title="Select a company" subtitle="Search or click a row above to view its full ownership structure and UBO trace."></app-empty-state>
+</div>

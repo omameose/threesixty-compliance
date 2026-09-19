@@ -1,0 +1,44 @@
+<app-page-header title="STR/SAR Management" subtitle="Alert → Investigation → Suspicion Established → Compliance Approval → Regulatory Filing → Permanent Record.">
+</app-page-header>
+
+<div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+  <div class="card p-5"><p class="muted mb-1">Drafting</p><p class="text-2xl font-bold text-ink-900">{{ countByStatus('drafting') }}</p></div>
+  <div class="card p-5"><p class="muted mb-1">Pending Approval</p><p class="text-2xl font-bold text-amber-600">{{ countByStatus('pending_approval') }}</p></div>
+  <div class="card p-5"><p class="muted mb-1">Filed with NFIU</p><p class="text-2xl font-bold text-blue-600">{{ countByStatus('filed') }}</p></div>
+  <div class="card p-5"><p class="muted mb-1">Confirmed</p><p class="text-2xl font-bold text-brand-600">{{ countByStatus('confirmed') }}</p></div>
+</div>
+
+<div class="card overflow-x-auto" *ngIf="!loading">
+  <table class="table">
+    <thead><tr><th>Case</th><th>Customer</th><th>Narrative</th><th>Status</th><th>Deadline</th><th>Prepared By</th><th></th></tr></thead>
+    <tbody>
+      <tr *ngFor="let f of filings">
+        <td><a [routerLink]="['/app/cases', f.caseId]" class="font-mono text-xs text-brand-600 hover:underline">{{ f.caseNumber }}</a></td>
+        <td class="font-medium text-ink-900">{{ f.customerName }}</td>
+        <td class="text-sm text-ink-600 max-w-sm">{{ f.narrativeSummary }}</td>
+        <td><span [ngClass]="statusBadge(f.status)">{{ f.status.replace('_',' ') }}</span></td>
+        <td>
+          <span class="text-sm" *ngIf="f.status !== 'filed' && f.status !== 'confirmed'"
+                [ngClass]="daysToDeadline(f.deadline) < 3 ? 'text-red-600 font-semibold' : 'text-ink-600'">
+            {{ daysToDeadline(f.deadline) }} days left
+          </span>
+          <span class="text-sm text-ink-500" *ngIf="f.status === 'filed' || f.status === 'confirmed'">Filed {{ f.filedAt }}</span>
+          <p class="text-xs text-ink-400 font-mono mt-0.5" *ngIf="f.filingRef">{{ f.filingRef }}</p>
+        </td>
+        <td class="text-sm text-ink-600">{{ f.preparedBy }}</td>
+        <td>
+          <button class="btn-secondary btn-sm" *ngIf="f.status === 'drafting'">Continue Drafting</button>
+          <button class="btn-primary btn-sm" *ngIf="f.status === 'pending_approval'">Maker/Checker Review</button>
+          <span class="text-xs text-ink-400" *ngIf="f.status === 'filed' || f.status === 'confirmed'">Approved by {{ f.approvedBy }}</span>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<div *ngIf="loading" class="flex items-center justify-center py-24 text-ink-400">Loading filings...</div>
+
+<div class="card p-5 mt-6 flex items-start gap-3">
+  <app-icon name="info" [size]="18" class="text-brand-600 shrink-0 mt-0.5"></app-icon>
+  <p class="text-sm text-ink-600">Submission goes out through a dedicated NFIU regulatory connector behind a maker/checker gate — the platform never files anything a human hasn't approved.</p>
+</div>

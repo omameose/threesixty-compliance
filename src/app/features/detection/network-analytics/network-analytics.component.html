@@ -1,0 +1,94 @@
+<app-page-header title="Network / Graph Analytics" subtitle="Model relationships between customers, accounts, devices and merchants to surface hidden risk exposure.">
+</app-page-header>
+
+<div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6" *ngIf="!loading">
+  <div class="card p-5"><p class="muted mb-1">Entities Mapped</p><p class="text-2xl font-bold text-ink-900">{{ graph.nodes.length }}</p></div>
+  <div class="card p-5"><p class="muted mb-1">High-Risk Entities</p><p class="text-2xl font-bold text-red-500">{{ highRiskClusterCount() }}</p></div>
+  <div class="card p-5"><p class="muted mb-1">Shared Devices</p><p class="text-2xl font-bold text-ink-900">{{ sharedDeviceCount() }}</p></div>
+  <div class="card p-5"><p class="muted mb-1">Relationships Mapped</p><p class="text-2xl font-bold text-ink-900">{{ graph.edges.length }}</p></div>
+</div>
+
+<div *ngIf="!loading">
+  <div class="flex flex-col sm:flex-row sm:items-center gap-3 mb-4">
+    <div class="relative flex-1 max-w-sm">
+      <app-icon name="search" [size]="16" class="absolute left-3 top-1/2 -translate-y-1/2 text-ink-400"></app-icon>
+      <input class="input pl-9" placeholder="Search a customer, device, merchant or business..." [(ngModel)]="query"/>
+      <div class="absolute mt-1 w-full bg-white rounded-xl shadow-xl border border-ink-100 z-30 overflow-hidden" *ngIf="searchResults().length">
+        <button *ngFor="let n of searchResults()" class="flex items-center gap-2 w-full px-3 py-2 text-sm text-ink-700 hover:bg-ink-50" (click)="jumpTo(n.id)">
+          <span class="w-2 h-2 rounded-full shrink-0" [style.background]="typeColor(n.type)"></span> {{ n.label }}
+          <span class="text-xs text-ink-400 ml-auto capitalize">{{ n.type }}</span>
+        </button>
+      </div>
+    </div>
+    <button class="btn-secondary btn-sm" *ngIf="history().length" (click)="goBack()">
+      <app-icon name="arrow-left" [size]="14"></app-icon> Back
+    </button>
+    <div class="flex items-center gap-1.5 flex-wrap text-xs text-ink-400">
+      <span *ngFor="let id of history()">{{ node(id)?.label }} &rarr;</span>
+      <span class="font-semibold text-ink-700">{{ focusNode()?.label }}</span>
+    </div>
+  </div>
+
+  <div class="grid lg:grid-cols-5 gap-5">
+    <div class="lg:col-span-3 card p-4">
+      <svg [attr.viewBox]="'0 0 ' + width + ' ' + height" class="w-full" style="max-height: 480px;">
+        <!-- edges -->
+        <g *ngFor="let n of neighbors()">
+          <line [attr.x1]="centerX" [attr.y1]="centerY" [attr.x2]="n.x" [attr.y2]="n.y" stroke="#d5dbe1" stroke-width="1.5"/>
+        </g>
+
+        <!-- neighbor nodes -->
+        <g *ngFor="let n of neighbors()" class="cursor-pointer" (click)="focusOn(n.id)">
+          <circle [attr.cx]="n.x" [attr.cy]="n.y" r="22" [attr.fill]="typeColor(n.type)" [attr.stroke]="riskRingColor(n.risk)" stroke-width="3"/>
+          <text [attr.x]="n.x" [attr.y]="n.y + 38" text-anchor="middle" font-size="11" fill="#1f2228" font-weight="600">{{ n.label }}</text>
+          <text [attr.x]="n.x" [attr.y]="n.y + 51" text-anchor="middle" font-size="9.5" fill="#8a94a6">{{ n.relation }}</text>
+        </g>
+
+        <!-- focus node -->
+        <g *ngIf="focusNode() as f">
+          <circle [attr.cx]="centerX" [attr.cy]="centerY" r="32" [attr.fill]="typeColor(f.type)" [attr.stroke]="riskRingColor(f.risk)" stroke-width="4"/>
+          <text [attr.x]="centerX" [attr.y]="centerY + 4" text-anchor="middle" font-size="11" fill="#fff" font-weight="700">{{ f.type === 'customer' ? '●' : f.type.slice(0,3).toUpperCase() }}</text>
+          <text [attr.x]="centerX" [attr.y]="centerY + 50" text-anchor="middle" font-size="13" fill="#1f2228" font-weight="700">{{ f.label }}</text>
+        </g>
+      </svg>
+
+      <div class="flex items-center justify-center gap-4 flex-wrap mt-2 pt-3 border-t border-ink-100 text-xs text-ink-500">
+        <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full" style="background:#3b82f6"></span> Customer</span>
+        <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full" style="background:#8b5cf6"></span> Device</span>
+        <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full" style="background:#f59e0b"></span> Merchant</span>
+        <span class="flex items-center gap-1.5"><span class="w-2.5 h-2.5 rounded-full" style="background:#128a4d"></span> Business</span>
+        <span class="flex items-center gap-1.5 ml-2"><span class="w-2.5 h-2.5 rounded-full border-2 border-red-500"></span> High risk ring</span>
+      </div>
+    </div>
+
+    <div class="lg:col-span-2 space-y-4">
+      <div class="card p-5" *ngIf="focusNode() as f">
+        <div class="flex items-center justify-between mb-2">
+          <h3 class="font-semibold text-ink-900">{{ f.label }}</h3>
+          <span [ngClass]="f.risk === 'high' ? 'badge-red' : f.risk === 'medium' ? 'badge-yellow' : 'badge-green'">{{ f.risk }} risk</span>
+        </div>
+        <p class="text-xs text-ink-400 uppercase tracking-wide mb-2">{{ f.type }}</p>
+        <p class="text-sm text-ink-600 mb-3">{{ f.detail }}</p>
+        <a *ngIf="f.customerId" [routerLink]="['/app/my-clients', f.customerId]" class="text-sm text-brand-600 hover:underline flex items-center gap-1.5">
+          <app-icon name="eye" [size]="14"></app-icon> View customer profile
+        </a>
+      </div>
+
+      <div class="card overflow-hidden">
+        <div class="p-4 border-b border-ink-100"><h3 class="font-semibold text-ink-900 text-sm">Relationships ({{ neighbors().length }})</h3></div>
+        <div class="divide-y divide-ink-50 max-h-80 overflow-y-auto">
+          <button *ngFor="let n of neighbors()" class="w-full text-left flex items-center justify-between gap-2 px-4 py-3 hover:bg-ink-50" (click)="focusOn(n.id)">
+            <div class="min-w-0">
+              <p class="text-sm font-medium text-ink-900 truncate">{{ n.label }}</p>
+              <p class="text-xs text-ink-400 truncate">{{ n.relation }}</p>
+            </div>
+            <span [ngClass]="n.risk === 'high' ? 'badge-red' : n.risk === 'medium' ? 'badge-yellow' : 'badge-green'" class="shrink-0">{{ n.risk }}</span>
+          </button>
+          <p class="px-4 py-6 text-sm text-ink-400 text-center" *ngIf="!neighbors().length">No mapped relationships for this entity.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div *ngIf="loading" class="flex items-center justify-center py-24 text-ink-400">Loading relationship graph...</div>

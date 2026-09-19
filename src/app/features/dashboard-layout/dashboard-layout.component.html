@@ -1,0 +1,172 @@
+<div class="h-screen flex bg-ink-50/40 overflow-hidden">
+
+  <!-- Mobile overlay -->
+  <div class="fixed inset-0 bg-ink-950/50 z-30 lg:hidden" *ngIf="mobileSidebarOpen()" (click)="toggleMobileSidebar()"></div>
+
+  <!-- SIDEBAR -->
+  <aside
+    class="fixed lg:static z-40 top-0 left-0 h-full bg-white border-r border-ink-100 flex flex-col transition-all duration-200"
+    [class.w-[260px]]="!sidebarCollapsed()"
+    [class.w-[76px]]="sidebarCollapsed()"
+    [class.-translate-x-full]="!mobileSidebarOpen() && isMobile()"
+    [class.translate-x-0]="mobileSidebarOpen() || !isMobile()">
+
+    <div class="h-16 flex items-center justify-between px-4 border-b border-ink-100 shrink-0">
+      <a routerLink="/app/dashboard" class="flex items-center gap-2 font-extrabold overflow-hidden">
+        <span class="w-8 h-8 rounded-lg bg-brand-600 text-white flex items-center justify-center shrink-0">
+          <app-icon name="shield" [size]="18"></app-icon>
+        </span>
+        <span *ngIf="!sidebarCollapsed()" class="whitespace-nowrap">360<span class="text-brand-600">Compliance</span></span>
+      </a>
+      <button class="hidden lg:flex text-ink-400 hover:text-ink-700 p-1" (click)="toggleSidebar()">
+        <app-icon [name]="sidebarCollapsed() ? 'chevron-right' : 'chevron-left'" [size]="18"></app-icon>
+      </button>
+      <button class="lg:hidden text-ink-400 p-1" (click)="toggleMobileSidebar()">
+        <app-icon name="x" [size]="20"></app-icon>
+      </button>
+    </div>
+
+    <nav class="flex-1 overflow-y-auto px-3 py-4 space-y-6">
+      <div class="space-y-1">
+        <a *ngFor="let item of mainNav" [routerLink]="item.path" routerLinkActive="bg-brand-50 text-brand-700 font-semibold"
+           [routerLinkActiveOptions]="{exact: false}"
+           class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-ink-600 hover:bg-ink-50 transition"
+           [class.justify-center]="sidebarCollapsed()">
+          <app-icon [name]="item.icon" [size]="19"></app-icon>
+          <span *ngIf="!sidebarCollapsed()" class="whitespace-nowrap">{{ item.label }}</span>
+        </a>
+      </div>
+
+      <div *ngFor="let group of navGroups">
+        <button *ngIf="!sidebarCollapsed()" (click)="toggleGroup(group.label)"
+                class="w-full flex items-center justify-between px-3 mb-2 text-[11px] font-semibold uppercase tracking-wider text-ink-400 hover:text-ink-600">
+          <span>{{ group.label }}</span>
+          <app-icon [name]="expandedGroups()[group.label] ? 'chevron-down' : 'chevron-right'" [size]="13"></app-icon>
+        </button>
+        <div class="space-y-1" *ngIf="sidebarCollapsed() || expandedGroups()[group.label]">
+          <a *ngFor="let item of group.items" [routerLink]="item.path" routerLinkActive="bg-brand-50 text-brand-700 font-semibold"
+             class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-ink-600 hover:bg-ink-50 transition"
+             [class.justify-center]="sidebarCollapsed()" [title]="item.label">
+            <app-icon [name]="item.icon" [size]="19"></app-icon>
+            <span *ngIf="!sidebarCollapsed()" class="whitespace-nowrap">{{ item.label }}</span>
+          </a>
+        </div>
+      </div>
+
+      <div>
+        <p *ngIf="!sidebarCollapsed()" class="px-3 text-[11px] font-semibold uppercase tracking-wider text-ink-400 mb-2">Account</p>
+        <div class="space-y-1">
+          <a *ngFor="let item of accountNav" [routerLink]="item.path" routerLinkActive="bg-brand-50 text-brand-700 font-semibold"
+             class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-ink-600 hover:bg-ink-50 transition"
+             [class.justify-center]="sidebarCollapsed()">
+            <app-icon [name]="item.icon" [size]="19"></app-icon>
+            <span *ngIf="!sidebarCollapsed()" class="whitespace-nowrap">{{ item.label }}</span>
+          </a>
+        </div>
+      </div>
+
+      <div>
+        <div class="space-y-1">
+          <a *ngFor="let item of bottomNav" [routerLink]="item.path" routerLinkActive="bg-brand-50 text-brand-700 font-semibold"
+             class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-ink-600 hover:bg-ink-50 transition"
+             [class.justify-center]="sidebarCollapsed()">
+            <app-icon [name]="item.icon" [size]="19"></app-icon>
+            <span *ngIf="!sidebarCollapsed()" class="whitespace-nowrap">{{ item.label }}</span>
+          </a>
+        </div>
+      </div>
+    </nav>
+
+    <div class="p-3 border-t border-ink-100 shrink-0">
+      <div *ngIf="!sidebarCollapsed() && trialBannerVisible()" class="bg-brand-50 rounded-xl p-3.5 mb-2 relative">
+        <button class="absolute top-2 right-2 text-ink-400 hover:text-ink-600" (click)="trialBannerVisible.set(false)">
+          <app-icon name="x" [size]="14"></app-icon>
+        </button>
+        <p class="text-sm font-semibold text-ink-900 mb-1">Standard Plan</p>
+        <p class="text-xs text-ink-500 mb-3">1,840 / 2,500 verifications used this cycle.</p>
+        <div class="w-full h-1.5 bg-white rounded-full mb-3 overflow-hidden">
+          <div class="h-full bg-brand-600 rounded-full" style="width: 73.6%"></div>
+        </div>
+        <a routerLink="/app/subscription" class="text-xs font-semibold text-brand-700 hover:underline">Manage plan &rarr;</a>
+      </div>
+      <button class="flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm text-ink-600 hover:bg-red-50 hover:text-red-600 transition w-full"
+              [class.justify-center]="sidebarCollapsed()" (click)="logout()">
+        <app-icon name="logout" [size]="19"></app-icon>
+        <span *ngIf="!sidebarCollapsed()">Logout</span>
+      </button>
+    </div>
+  </aside>
+
+  <!-- MAIN -->
+  <div class="flex-1 flex flex-col min-w-0">
+    <!-- TOPBAR -->
+    <header class="h-16 bg-white border-b border-ink-100 flex items-center justify-between px-4 sm:px-6 shrink-0">
+      <div class="flex items-center gap-3 flex-1 min-w-0">
+        <button class="lg:hidden text-ink-500 p-1" (click)="toggleMobileSidebar()">
+          <app-icon name="menu" [size]="22"></app-icon>
+        </button>
+        <div class="relative max-w-md w-full hidden sm:block">
+          <app-icon name="search" [size]="17" class="absolute left-3 top-1/2 -translate-y-1/2 text-ink-400"></app-icon>
+          <input class="input pl-9 bg-ink-50/60 border-transparent focus:bg-white" placeholder="Search customers, forms, submissions..."/>
+        </div>
+      </div>
+
+      <div class="flex items-center gap-2 sm:gap-3 shrink-0">
+        <a routerLink="/app/form-builder" class="btn-primary btn-sm hidden sm:inline-flex">
+          <app-icon name="plus" [size]="15"></app-icon> Create Form
+        </a>
+
+        <div class="relative">
+          <button class="w-9 h-9 rounded-full hover:bg-ink-100 flex items-center justify-center text-ink-500 relative" (click)="toggleNotif()">
+            <app-icon name="bell" [size]="19"></app-icon>
+            <span class="absolute top-1.5 right-2 w-2 h-2 bg-red-500 rounded-full"></span>
+          </button>
+          <div *ngIf="notifOpen()" class="absolute right-0 mt-2 w-80 bg-white rounded-xl shadow-xl border border-ink-100 z-50 fade-in overflow-hidden">
+            <div class="px-4 py-3 border-b border-ink-100 font-semibold text-sm">Notifications</div>
+            <div class="max-h-80 overflow-y-auto divide-y divide-ink-100">
+              <div class="px-4 py-3 text-sm hover:bg-ink-50">
+                <p class="text-ink-800">New high-risk match found for <strong>Ibrahim Musa</strong></p>
+                <p class="text-xs text-ink-400 mt-0.5">22 mins ago</p>
+              </div>
+              <div class="px-4 py-3 text-sm hover:bg-ink-50">
+                <p class="text-ink-800"><strong>Tolulope Oke</strong> completed KYC verification</p>
+                <p class="text-xs text-ink-400 mt-0.5">5 mins ago</p>
+              </div>
+              <div class="px-4 py-3 text-sm hover:bg-ink-50">
+                <p class="text-ink-800">Webhook delivery failed — check endpoint</p>
+                <p class="text-xs text-ink-400 mt-0.5">1 hour ago</p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="relative">
+          <button class="flex items-center gap-2 pl-1.5 pr-2 py-1 rounded-full hover:bg-ink-100" (click)="toggleProfileMenu()">
+            <app-avatar [name]="user()?.firstName + ' ' + user()?.lastName" [size]="32"></app-avatar>
+            <span class="text-sm font-medium text-ink-800 hidden md:inline">{{ user()?.firstName }}</span>
+            <app-icon name="chevron-down" [size]="14" class="text-ink-400 hidden md:inline"></app-icon>
+          </button>
+          <div *ngIf="profileMenuOpen()" class="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-xl border border-ink-100 z-50 fade-in overflow-hidden">
+            <div class="px-4 py-3 border-b border-ink-100">
+              <p class="text-sm font-semibold text-ink-900">{{ user()?.firstName }} {{ user()?.lastName }}</p>
+              <p class="text-xs text-ink-400">{{ user()?.email }}</p>
+            </div>
+            <a routerLink="/app/profile" class="flex items-center gap-2 px-4 py-2.5 text-sm text-ink-600 hover:bg-ink-50">
+              <app-icon name="user" [size]="16"></app-icon> View Profile
+            </a>
+            <a routerLink="/app/settings" class="flex items-center gap-2 px-4 py-2.5 text-sm text-ink-600 hover:bg-ink-50">
+              <app-icon name="settings" [size]="16"></app-icon> Settings
+            </a>
+            <button (click)="logout()" class="flex items-center gap-2 px-4 py-2.5 text-sm text-red-600 hover:bg-red-50 w-full">
+              <app-icon name="logout" [size]="16"></app-icon> Logout
+            </button>
+          </div>
+        </div>
+      </div>
+    </header>
+
+    <main class="flex-1 overflow-y-auto p-4 sm:p-6">
+      <router-outlet></router-outlet>
+    </main>
+  </div>
+</div>

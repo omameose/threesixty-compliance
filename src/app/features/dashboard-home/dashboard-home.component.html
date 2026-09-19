@@ -1,0 +1,145 @@
+<app-page-header title="Dashboard" subtitle="Overview of your compliance program and customer verifications.">
+  <a routerLink="/app/my-clients" class="btn-secondary"><app-icon name="clients" [size]="16"></app-icon> View Clients</a>
+  <a routerLink="/app/form-builder" class="btn-primary"><app-icon name="plus" [size]="16"></app-icon> New Compliance Form</a>
+</app-page-header>
+
+<ng-container *ngIf="stats">
+  <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+    <app-stat-card label="Total Customers" [value]="stats.totalCustomers" [delta]="stats.totalCustomersDelta" icon="clients"></app-stat-card>
+    <app-stat-card label="Approval Rate" [value]="stats.approvedRate + '%'" [delta]="stats.approvedRateDelta" icon="check-circle"></app-stat-card>
+    <app-stat-card label="Pending Review" [value]="stats.pendingReview" [delta]="stats.pendingReviewDelta" icon="clock"></app-stat-card>
+    <app-stat-card label="Avg. Verification Time" [value]="stats.avgVerificationTime" [delta]="stats.avgVerificationTimeDelta" icon="gauge"></app-stat-card>
+  </div>
+
+  <div class="grid lg:grid-cols-3 gap-5 mb-6">
+    <div class="card p-5 lg:col-span-2">
+      <div class="flex items-center justify-between mb-4">
+        <div>
+          <h3 class="font-semibold text-ink-900">Verification Volume</h3>
+          <p class="muted">Monthly KYC, KYB and AML checks processed</p>
+        </div>
+        <select class="input !w-auto !py-1.5 !text-xs">
+          <option>Last 6 months</option>
+          <option>Last 12 months</option>
+        </select>
+      </div>
+      <div style="height: 280px;">
+        <app-chart type="bar" [data]="verificationsChartData" [options]="verificationsChartOptions"></app-chart>
+      </div>
+    </div>
+
+    <div class="card p-5">
+      <h3 class="font-semibold text-ink-900 mb-1">Submission Status</h3>
+      <p class="muted mb-4">Breakdown of all submissions</p>
+      <div style="height: 190px;" class="relative flex items-center justify-center mb-4">
+        <app-chart type="doughnut" [data]="statusChartData" [options]="statusChartOptions"></app-chart>
+        <div class="absolute text-center pointer-events-none">
+          <p class="text-2xl font-bold text-ink-900">{{ stats.totalCustomers }}</p>
+          <p class="text-xs text-ink-400">Total</p>
+        </div>
+      </div>
+      <div class="space-y-2">
+        <div class="flex items-center justify-between text-sm" *ngFor="let s of stats.statusBreakdown">
+          <span class="flex items-center gap-2 text-ink-600">
+            <span class="w-2.5 h-2.5 rounded-full" [style.background]="s.color"></span> {{ s.status }}
+          </span>
+          <span class="font-medium text-ink-800">{{ s.value }}</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="grid lg:grid-cols-3 gap-5">
+    <div class="card p-5">
+      <h3 class="font-semibold text-ink-900 mb-1">Risk Distribution</h3>
+      <p class="muted mb-4">Customer risk levels</p>
+      <div style="height: 200px;">
+        <app-chart type="bar" [data]="riskChartData" [options]="riskChartOptions"></app-chart>
+      </div>
+    </div>
+
+    <div class="card p-5 lg:col-span-2">
+      <div class="flex items-center justify-between mb-4">
+        <h3 class="font-semibold text-ink-900">Recent Activity</h3>
+        <a class="text-sm text-brand-600 font-medium hover:underline">View all</a>
+      </div>
+      <div class="space-y-1">
+        <div class="flex items-start gap-3 py-2.5 border-b border-ink-50 last:border-0" *ngFor="let a of stats.recentActivity">
+          <div class="w-8 h-8 rounded-full bg-ink-100 text-ink-500 flex items-center justify-center shrink-0 mt-0.5">
+            <app-icon [name]="a.icon === 'check' ? 'check-circle' : a.icon === 'alert' ? 'alert-triangle' : a.icon === 'form' ? 'form-builder' : a.icon === 'user' ? 'user' : a.icon === 'webhook' ? 'webhook' : 'info'" [size]="15"></app-icon>
+          </div>
+          <div class="flex-1 min-w-0">
+            <p class="text-sm text-ink-800">{{ a.text }}</p>
+            <p class="text-xs text-ink-400 mt-0.5">{{ a.time }}</p>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="flex items-center justify-between mt-10 mb-4">
+    <div>
+      <h2 class="text-lg font-bold text-ink-900">Compliance &amp; Risk Intelligence</h2>
+      <p class="muted">Live signal from screening, detection and investigation across the platform.</p>
+    </div>
+    <a routerLink="/app/war-room" class="btn-secondary btn-sm"><app-icon name="activity" [size]="14"></app-icon> Executive War Room</a>
+  </div>
+
+  <ng-container *ngIf="!intelLoading">
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-5">
+      <app-stat-card label="Open Alerts" [value]="openAlertsCount" [delta]="0" icon="bell"></app-stat-card>
+      <app-stat-card label="Active Investigations" [value]="activeInvestigations" [delta]="0" icon="folder"></app-stat-card>
+      <app-stat-card label="Sanctions Matches" [value]="sanctionsMatches" [delta]="0" icon="shield"></app-stat-card>
+      <app-stat-card label="PEP Matches" [value]="pepMatches" [delta]="0" icon="user-check"></app-stat-card>
+    </div>
+
+    <div class="grid lg:grid-cols-3 gap-5 mb-5">
+      <div class="card p-5">
+        <h3 class="font-semibold text-ink-900 mb-1">Alerts by Severity</h3>
+        <p class="muted mb-4">All open and historical alerts</p>
+        <div style="height: 180px;">
+          <app-chart type="bar" [data]="alertSeverityChartData" [options]="alertSeverityChartOptions"></app-chart>
+        </div>
+      </div>
+
+      <div class="card p-5 lg:col-span-2">
+        <h3 class="font-semibold text-ink-900 mb-1">Screening Snapshot</h3>
+        <p class="muted mb-4">Sanctions, PEP and adverse-media verdicts across screened subjects</p>
+        <div style="height: 180px;">
+          <app-chart type="bar" [data]="screeningChartData" [options]="screeningChartOptions"></app-chart>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid lg:grid-cols-3 gap-5">
+      <a routerLink="/app/detection/transaction-monitoring" class="card p-5 hover:shadow-lg hover:-translate-y-0.5 transition">
+        <div class="flex items-center justify-between mb-1">
+          <h3 class="font-semibold text-ink-900">Transaction Monitoring</h3>
+          <app-icon name="activity" [size]="16" class="text-brand-600"></app-icon>
+        </div>
+        <p class="text-2xl font-bold text-red-500 mt-2">{{ tmsEscalated }}</p>
+        <p class="muted">Scenario hits escalated for investigation</p>
+      </a>
+      <a routerLink="/app/detection/fraud" class="card p-5 hover:shadow-lg hover:-translate-y-0.5 transition">
+        <div class="flex items-center justify-between mb-1">
+          <h3 class="font-semibold text-ink-900">Fraud Detection</h3>
+          <app-icon name="alert-triangle" [size]="16" class="text-brand-600"></app-icon>
+        </div>
+        <p class="text-2xl font-bold text-red-500 mt-2">{{ fraudEscalated }}</p>
+        <p class="muted">Fraud typology hits escalated</p>
+      </a>
+      <a routerLink="/app/model-governance" class="card p-5 hover:shadow-lg hover:-translate-y-0.5 transition">
+        <div class="flex items-center justify-between mb-1">
+          <h3 class="font-semibold text-ink-900">Model Health</h3>
+          <app-icon name="cpu" [size]="16" class="text-brand-600"></app-icon>
+        </div>
+        <p class="text-2xl font-bold text-ink-900 mt-2">{{ avgModelPrecision }}% <span class="text-sm font-medium text-ink-400">avg. precision</span></p>
+        <p class="muted">{{ modelsInReview }} model(s) currently in review</p>
+      </a>
+    </div>
+  </ng-container>
+
+  <div *ngIf="intelLoading" class="flex items-center justify-center py-16 text-ink-400">Loading compliance intelligence...</div>
+</ng-container>
+
+<div *ngIf="loading" class="flex items-center justify-center py-24 text-ink-400">Loading dashboard...</div>

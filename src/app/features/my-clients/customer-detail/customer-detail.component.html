@@ -1,0 +1,169 @@
+<div *ngIf="loading" class="flex items-center justify-center py-24 text-ink-400">Loading submission...</div>
+
+<ng-container *ngIf="!loading && customer">
+  <button class="flex items-center gap-1.5 text-sm text-ink-500 hover:text-brand-600 mb-4" (click)="goBack()">
+    <app-icon name="arrow-left" [size]="15"></app-icon> Back
+  </button>
+
+  <div class="fixed bottom-6 right-6 z-40 bg-ink-900 text-white text-sm px-4 py-3 rounded-lg shadow-lg max-w-sm fade-in" *ngIf="actionSuccess()">
+    {{ actionSuccess() }}
+  </div>
+
+  <div class="grid lg:grid-cols-3 gap-6">
+    <!-- Main -->
+    <div class="lg:col-span-2 space-y-6">
+      <div class="card p-6">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+          <div class="flex items-center gap-4">
+            <app-avatar [name]="customer.fullName" [size]="56"></app-avatar>
+            <div>
+              <h1 class="text-xl font-bold text-ink-950">{{ customer.fullName }}</h1>
+              <p class="muted">{{ customer.email }} &middot; {{ customer.phone }}</p>
+              <p class="text-xs text-ink-400 font-mono mt-1">{{ customer.complianceId }}</p>
+            </div>
+          </div>
+          <span [ngClass]="statusBadgeClass(customer.status)" class="text-sm">{{ statusLabel(customer.status) }}</span>
+        </div>
+      </div>
+
+      <div class="card p-6">
+        <h3 class="font-semibold text-ink-900 mb-4">Submitted Information</h3>
+        <div class="space-y-4">
+          <div *ngFor="let a of customer.answers" class="flex items-start justify-between gap-4 py-3 border-b border-ink-50 last:border-0">
+            <div class="min-w-0">
+              <p class="text-xs text-ink-400 mb-0.5">{{ a.label }}</p>
+              <p class="text-sm font-medium text-ink-900 break-words" *ngIf="a.type !== 'file_upload'">{{ a.value }}</p>
+              <div *ngIf="a.type === 'file_upload'" class="flex items-center gap-2 mt-1">
+                <div class="w-9 h-9 rounded-lg bg-ink-100 text-ink-500 flex items-center justify-center shrink-0">
+                  <app-icon name="file-check" [size]="16"></app-icon>
+                </div>
+                <div>
+                  <p class="text-sm font-medium text-ink-900">{{ a.fileName }}</p>
+                  <p class="text-xs text-ink-400">{{ a.fileSize }}</p>
+                </div>
+              </div>
+            </div>
+            <button *ngIf="a.type === 'file_upload'" class="btn-secondary btn-sm shrink-0" (click)="downloadAnswer(a.fileName)">
+              <app-icon name="download" [size]="14"></app-icon> Download
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="card p-6">
+        <h3 class="font-semibold text-ink-900 mb-4">Timeline</h3>
+        <div class="space-y-4">
+          <div *ngFor="let t of customer.timeline; let last = last" class="flex gap-3">
+            <div class="flex flex-col items-center">
+              <span class="w-2.5 h-2.5 rounded-full bg-brand-600 mt-1"></span>
+              <span class="w-px flex-1 bg-ink-100" *ngIf="!last"></span>
+            </div>
+            <div class="pb-4">
+              <p class="text-sm font-medium text-ink-900">{{ t.label }}</p>
+              <p class="text-xs text-ink-400">{{ t.date }}</p>
+              <p class="text-xs text-ink-500 mt-1 bg-ink-50 rounded-md px-2 py-1 inline-block" *ngIf="t.note">{{ t.note }}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Sidebar -->
+    <div class="space-y-6">
+      <div class="card p-5">
+        <h3 class="font-semibold text-ink-900 mb-4">Review Decision</h3>
+        <div class="space-y-2">
+          <button class="btn-primary w-full justify-center" [disabled]="customer.status === 'approved'" (click)="approve()">
+            <app-icon name="check-circle" [size]="16"></app-icon> Approve
+          </button>
+          <button class="btn-secondary w-full justify-center" (click)="requestInfoModalOpen.set(true)">
+            <app-icon name="info" [size]="16"></app-icon> Request More Info
+          </button>
+          <button class="btn-danger w-full justify-center" [disabled]="customer.status === 'rejected'" (click)="rejectModalOpen.set(true)">
+            <app-icon name="x-circle" [size]="16"></app-icon> Reject
+          </button>
+        </div>
+        <p class="text-xs text-ink-400 mt-4 flex gap-1.5"><app-icon name="webhook" [size]="14" class="shrink-0 mt-0.5"></app-icon> A webhook event will be sent to your configured endpoint on every decision.</p>
+      </div>
+
+      <div class="card p-5">
+        <h3 class="font-semibold text-ink-900 mb-4">Risk & Screening</h3>
+        <div class="flex items-center justify-between mb-3">
+          <span class="muted">Risk Score</span>
+          <span class="font-semibold text-ink-900">{{ customer.riskScore }}/100</span>
+        </div>
+        <div class="w-full h-2 bg-ink-100 rounded-full overflow-hidden mb-4">
+          <div class="h-full rounded-full" [ngClass]="customer.riskLevel === 'low' ? 'bg-brand-600' : customer.riskLevel === 'medium' ? 'bg-amber-500' : 'bg-red-500'" [style.width.%]="customer.riskScore"></div>
+        </div>
+        <div class="space-y-2.5 text-sm">
+          <div class="flex items-center justify-between">
+            <span class="text-ink-500 flex items-center gap-1.5"><app-icon name="shield" [size]="14"></app-icon> Sanctions Check</span>
+            <span [ngClass]="customer.sanctionsHit ? 'badge-red' : 'badge-green'">{{ customer.sanctionsHit ? 'Match Found' : 'Clear' }}</span>
+          </div>
+          <div class="flex items-center justify-between">
+            <span class="text-ink-500 flex items-center gap-1.5"><app-icon name="user-check" [size]="14"></app-icon> PEP Check</span>
+            <span [ngClass]="customer.pepHit ? 'badge-yellow' : 'badge-green'">{{ customer.pepHit ? 'Match Found' : 'Clear' }}</span>
+          </div>
+          <div class="flex items-center justify-between">
+            <span class="text-ink-500 flex items-center gap-1.5"><app-icon name="globe" [size]="14"></app-icon> Country</span>
+            <span class="text-ink-800 font-medium">{{ customer.country }}</span>
+          </div>
+        </div>
+      </div>
+
+      <div class="card p-5">
+        <h3 class="font-semibold text-ink-900 mb-1">Customer Intelligence</h3>
+        <p class="muted mb-4">Run screening scans and view their history for this customer.</p>
+        <div class="grid grid-cols-3 gap-2 mb-4">
+          <button class="btn-secondary btn-sm justify-center flex-col !gap-1 !py-2.5" [disabled]="!!runningScan()" (click)="runScan('sanctions')">
+            <app-icon name="shield" [size]="16"></app-icon>
+            <span class="text-[11px] leading-tight">{{ runningScan() === 'sanctions' ? 'Running...' : 'Sanctions' }}</span>
+          </button>
+          <button class="btn-secondary btn-sm justify-center flex-col !gap-1 !py-2.5" [disabled]="!!runningScan()" (click)="runScan('pep')">
+            <app-icon name="user-check" [size]="16"></app-icon>
+            <span class="text-[11px] leading-tight">{{ runningScan() === 'pep' ? 'Running...' : 'PEP' }}</span>
+          </button>
+          <button class="btn-secondary btn-sm justify-center flex-col !gap-1 !py-2.5" [disabled]="!!runningScan()" (click)="runScan('adverse-media')">
+            <app-icon name="newspaper" [size]="16"></app-icon>
+            <span class="text-[11px] leading-tight">{{ runningScan() === 'adverse-media' ? 'Running...' : 'Adv. Media' }}</span>
+          </button>
+        </div>
+
+        <div class="space-y-2" *ngIf="!intelligenceLoading && intelligence.length">
+          <a *ngFor="let i of intelligence" [routerLink]="[i.route]" [queryParams]="{ caseId: i.caseId }"
+             class="flex items-center justify-between gap-2 py-2 px-2.5 -mx-2.5 rounded-lg hover:bg-ink-50 text-sm">
+            <div class="min-w-0">
+              <p class="font-medium text-ink-900">{{ i.type }}</p>
+              <p class="text-xs text-ink-400">{{ i.date }}</p>
+            </div>
+            <span [ngClass]="verdictBadge(i.verdict)" class="shrink-0">{{ i.verdict.replace('_',' ') }}</span>
+          </a>
+        </div>
+        <p class="text-sm text-ink-400" *ngIf="!intelligenceLoading && !intelligence.length">No screenings run for this customer yet.</p>
+        <p class="text-sm text-ink-400" *ngIf="intelligenceLoading">Loading screening history...</p>
+      </div>
+
+      <div class="card p-5">
+        <h3 class="font-semibold text-ink-900 mb-3">Form</h3>
+        <p class="text-sm text-ink-600">{{ customer.formName }}</p>
+        <a [routerLink]="['/app/my-compliance', customer.formId]" class="text-xs font-medium text-brand-600 hover:underline mt-2 inline-block">View compliance form &rarr;</a>
+      </div>
+    </div>
+  </div>
+</ng-container>
+
+<app-modal [open]="requestInfoModalOpen()" title="Request more information" subtitle="An email will be sent to the customer asking them to provide additional details." (close)="requestInfoModalOpen.set(false)">
+  <textarea class="input" rows="4" [(ngModel)]="requestInfoNote" placeholder="e.g. Your ID document image was unclear. Please re-upload a clearer photo."></textarea>
+  <div modal-footer class="flex gap-3 w-full sm:w-auto">
+    <button class="btn-secondary flex-1" (click)="requestInfoModalOpen.set(false)">Cancel</button>
+    <button class="btn-primary flex-1" (click)="confirmRequestInfo()">Send Request</button>
+  </div>
+</app-modal>
+
+<app-modal [open]="rejectModalOpen()" title="Reject this submission?" subtitle="This action will notify the customer and close this verification." (close)="rejectModalOpen.set(false)">
+  <textarea class="input" rows="4" [(ngModel)]="rejectReason" placeholder="Reason for rejection (sent to customer)"></textarea>
+  <div modal-footer class="flex gap-3 w-full sm:w-auto">
+    <button class="btn-secondary flex-1" (click)="rejectModalOpen.set(false)">Cancel</button>
+    <button class="btn-danger flex-1" (click)="confirmReject()">Reject Submission</button>
+  </div>
+</app-modal>

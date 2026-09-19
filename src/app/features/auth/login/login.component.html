@@ -1,0 +1,41 @@
+<app-auth-shell headline="Welcome back to your compliance dashboard." sub="Sign in to review submissions, manage forms and monitor your compliance program.">
+  <h1 class="text-2xl font-bold text-ink-950 mb-1">Sign in</h1>
+  <p class="muted mb-7">Enter your credentials to access your dashboard.</p>
+
+  <form [formGroup]="form" (ngSubmit)="submit()" class="space-y-4">
+    <div>
+      <label class="label">Work email</label>
+      <input class="input" type="email" formControlName="email" placeholder="you@company.com"/>
+    </div>
+    <div>
+      <div class="flex items-center justify-between mb-1.5">
+        <label class="label !mb-0">Password</label>
+        <a routerLink="/auth/forgot-password" class="text-xs font-medium text-brand-600 hover:underline">Forgot password?</a>
+      </div>
+      <div class="relative">
+        <input class="input pr-10" [type]="showPassword ? 'text' : 'password'" formControlName="password" placeholder="Enter your password"/>
+        <button type="button" class="absolute right-3 top-1/2 -translate-y-1/2 text-ink-400" (click)="showPassword = !showPassword">
+          <app-icon [name]="showPassword ? 'eye' : 'eye'" [size]="18"></app-icon>
+        </button>
+      </div>
+    </div>
+    <label class="flex items-center gap-2 text-sm text-ink-600">
+      <input type="checkbox" formControlName="remember" class="rounded border-ink-300 text-brand-600 focus:ring-brand-500"/>
+      Remember me for 30 days
+    </label>
+
+    <button type="submit" class="btn-primary w-full py-3" [disabled]="loading">
+      <span *ngIf="!loading">Sign in</span>
+      <span *ngIf="loading">Signing in...</span>
+    </button>
+  </form>
+
+  <p class="text-center text-sm text-ink-500 mt-6">
+    Don't have an account? <a routerLink="/auth/register" class="text-brand-600 font-medium hover:underline">Create one</a>
+  </p>
+
+  <div class="mt-6 p-3 rounded-lg bg-ink-50 text-xs text-ink-500 flex gap-2">
+    <app-icon name="info" [size]="15" class="shrink-0 mt-0.5"></app-icon>
+    Demo credentials are pre-filled. Just hit Sign in — 2FA code screen is also mocked, use any 6 digits.
+  </div>
+</app-auth-shell>

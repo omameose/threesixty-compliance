@@ -1,0 +1,424 @@
+<div class="min-h-screen bg-white text-ink-900">
+  <!-- NAVBAR -->
+  <header class="sticky top-0 z-40 bg-white/90 backdrop-blur border-b border-ink-100">
+    <div class="max-w-7xl mx-auto px-5 sm:px-8 h-16 flex items-center justify-between">
+      <a routerLink="/" class="flex items-center gap-2 font-extrabold text-lg">
+        <span class="w-8 h-8 rounded-lg bg-brand-600 text-white flex items-center justify-center">
+          <app-icon name="shield" [size]="18"></app-icon>
+        </span>
+        <span>360<span class="text-brand-600">Compliance</span></span>
+      </a>
+
+      <nav class="hidden lg:flex items-center gap-8 text-sm font-medium text-ink-600">
+        <a href="#home" class="hover:text-brand-600">Home</a>
+        <a href="#platform" class="hover:text-brand-600">Platform</a>
+        <a href="#services" class="hover:text-brand-600">Services</a>
+        <a href="#how-it-works" class="hover:text-brand-600">How it Works</a>
+        <a href="#africa" class="hover:text-brand-600">Nigeria &amp; Africa</a>
+        <a href="#pricing" class="hover:text-brand-600">Pricing</a>
+        <a href="#faq" class="hover:text-brand-600">FAQ</a>
+      </nav>
+
+      <div class="hidden lg:flex items-center gap-3">
+        <a routerLink="/auth/login" class="btn-ghost">Sign In</a>
+        <a routerLink="/auth/register" class="btn-primary">Create Account</a>
+      </div>
+
+      <button class="lg:hidden p-2 text-ink-700" (click)="toggleMenu()">
+        <app-icon [name]="mobileMenuOpen ? 'x' : 'menu'" [size]="24"></app-icon>
+      </button>
+    </div>
+
+    <div *ngIf="mobileMenuOpen" class="lg:hidden border-t border-ink-100 px-5 py-4 flex flex-col gap-3 bg-white fade-in">
+      <a href="#home" class="py-1.5 text-ink-700" (click)="toggleMenu()">Home</a>
+      <a href="#platform" class="py-1.5 text-ink-700" (click)="toggleMenu()">Platform</a>
+      <a href="#services" class="py-1.5 text-ink-700" (click)="toggleMenu()">Services</a>
+      <a href="#how-it-works" class="py-1.5 text-ink-700" (click)="toggleMenu()">How it Works</a>
+      <a href="#africa" class="py-1.5 text-ink-700" (click)="toggleMenu()">Nigeria &amp; Africa</a>
+      <a href="#pricing" class="py-1.5 text-ink-700" (click)="toggleMenu()">Pricing</a>
+      <a href="#faq" class="py-1.5 text-ink-700" (click)="toggleMenu()">FAQ</a>
+      <div class="flex gap-3 pt-2">
+        <a routerLink="/auth/login" class="btn-secondary flex-1">Sign In</a>
+        <a routerLink="/auth/register" class="btn-primary flex-1">Get Started</a>
+      </div>
+    </div>
+  </header>
+
+  <!-- HERO -->
+  <section id="home" class="relative overflow-hidden bg-gradient-to-b from-brand-50/70 to-white">
+    <div class="max-w-7xl mx-auto px-5 sm:px-8 pt-16 pb-20 lg:pt-24 lg:pb-28 grid lg:grid-cols-2 gap-12 items-center">
+      <div>
+        <span class="badge-green mb-5">
+          <app-icon name="sparkles" [size]="14"></app-icon> Nigeria-first &middot; Africa-ready
+        </span>
+        <h1 class="text-4xl sm:text-5xl font-extrabold leading-tight tracking-tight text-ink-950">
+          A financial crime &amp; compliance intelligence platform, not a patchwork of point tools
+        </h1>
+        <p class="mt-5 text-lg text-ink-600 max-w-xl">
+          Know the customer. Understand the transaction. Detect the risk. Investigate the risk. Report the risk. Prove what you did — all in one platform, purpose-built for Nigerian banks, MFBs, PSPs and fintechs.
+        </p>
+        <div class="mt-8 flex flex-col sm:flex-row gap-3">
+          <a routerLink="/auth/register" class="btn-primary text-base px-6 py-3">
+            Create your account <app-icon name="arrow-right" [size]="16"></app-icon>
+          </a>
+          <a routerLink="/auth/login" class="btn-secondary text-base px-6 py-3">Sign in</a>
+        </div>
+        <div class="mt-8 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm text-ink-500">
+          <div class="flex items-center gap-1.5"><app-icon name="check-circle" [size]="16" class="text-brand-600"></app-icon> Explainable risk scoring</div>
+          <div class="flex items-center gap-1.5"><app-icon name="check-circle" [size]="16" class="text-brand-600"></app-icon> CBN / NFIU-aligned</div>
+          <div class="flex items-center gap-1.5"><app-icon name="check-circle" [size]="16" class="text-brand-600"></app-icon> Free plan available</div>
+        </div>
+      </div>
+
+      <div class="relative">
+        <div class="card p-5 sm:p-6 rotate-1 shadow-xl">
+          <div class="flex items-center justify-between mb-4">
+            <div class="font-semibold text-ink-900">Verification Overview</div>
+            <span class="badge-green">Live</span>
+          </div>
+          <div class="grid grid-cols-2 gap-3 mb-4">
+            <div class="rounded-xl bg-brand-50 p-4">
+              <p class="text-xs text-brand-700 font-medium">Approved</p>
+              <p class="text-2xl font-bold text-brand-800 mt-1">82.3%</p>
+            </div>
+            <div class="rounded-xl bg-ink-50 p-4">
+              <p class="text-xs text-ink-600 font-medium">Pending review</p>
+              <p class="text-2xl font-bold text-ink-800 mt-1">40</p>
+            </div>
+          </div>
+          <div class="space-y-3">
+            <div class="flex items-center gap-3 p-3 rounded-lg border border-ink-100">
+              <div class="w-9 h-9 rounded-full bg-brand-100 text-brand-700 flex items-center justify-center font-semibold text-xs">TO</div>
+              <div class="flex-1">
+                <p class="text-sm font-medium text-ink-900">Tolulope Oke</p>
+                <p class="text-xs text-ink-500">Individual Customer KYC</p>
+              </div>
+              <span class="badge-green">Approved</span>
+            </div>
+            <div class="flex items-center gap-3 p-3 rounded-lg border border-ink-100">
+              <div class="w-9 h-9 rounded-full bg-amber-100 text-amber-700 flex items-center justify-center font-semibold text-xs">IM</div>
+              <div class="flex-1">
+                <p class="text-sm font-medium text-ink-900">Ibrahim Musa</p>
+                <p class="text-xs text-ink-500">Flagged — sanctions match</p>
+              </div>
+              <span class="badge-red">High Risk</span>
+            </div>
+            <div class="flex items-center gap-3 p-3 rounded-lg border border-ink-100">
+              <div class="w-9 h-9 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center font-semibold text-xs">GE</div>
+              <div class="flex-1">
+                <p class="text-sm font-medium text-ink-900">Grace Effiong</p>
+                <p class="text-xs text-ink-500">Business / Merchant KYB</p>
+              </div>
+              <span class="badge-blue">In Review</span>
+            </div>
+          </div>
+        </div>
+        <div class="absolute -bottom-6 -left-6 card p-4 hidden sm:block shadow-lg">
+          <div class="flex items-center gap-2 text-sm font-medium text-ink-800">
+            <app-icon name="shield" [size]="18" class="text-brand-600"></app-icon> Sanctions match detected
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- TRUSTED BY -->
+  <section class="border-y border-ink-100 py-8 bg-white">
+    <div class="max-w-7xl mx-auto px-5 sm:px-8">
+      <p class="text-center text-xs uppercase tracking-widest text-ink-400 mb-6">Trusted by compliance-first teams</p>
+      <div class="flex flex-wrap justify-center gap-x-10 gap-y-4 text-ink-400 font-bold text-lg">
+        <span *ngFor="let l of logos">{{ l }}</span>
+      </div>
+    </div>
+  </section>
+
+  <!-- PLATFORM PILLARS -->
+  <section id="platform" class="py-20">
+    <div class="max-w-7xl mx-auto px-5 sm:px-8">
+      <div class="text-center max-w-2xl mx-auto mb-14">
+        <span class="badge-green mb-4">The platform</span>
+        <h2 class="text-3xl sm:text-4xl font-bold text-ink-950">Four pillars, one unified compliance layer</h2>
+        <p class="mt-3 text-ink-600">Not "we have PEP screening" — a single platform connecting customer risk, transaction behaviour, fraud, sanctions, investigations and regulatory reporting.</p>
+      </div>
+      <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
+        <div class="card p-6" *ngFor="let p of pillars">
+          <div class="w-11 h-11 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center mb-4">
+            <app-icon [name]="p.icon" [size]="22"></app-icon>
+          </div>
+          <h3 class="font-extrabold text-ink-950 tracking-wide">{{ p.title }}</h3>
+          <p class="text-sm text-brand-700 font-medium mb-3">{{ p.tagline }}</p>
+          <ul class="space-y-1.5">
+            <li class="text-sm text-ink-600 flex items-start gap-2" *ngFor="let item of p.items">
+              <app-icon name="check" [size]="13" class="text-brand-500 shrink-0 mt-1"></app-icon> {{ item }}
+            </li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- SERVICES -->
+  <section id="services" class="py-20 bg-ink-50/40">
+    <div class="max-w-7xl mx-auto px-5 sm:px-8">
+      <div class="text-center max-w-2xl mx-auto mb-10">
+        <span class="badge-green mb-4">What we offer</span>
+        <h2 class="text-3xl sm:text-4xl font-bold text-ink-950">Every compliance &amp; risk service a financial institution needs</h2>
+        <p class="mt-3 text-ink-600">Configure a single workflow or combine services across the full customer and transaction lifecycle.</p>
+      </div>
+
+      <div class="flex items-center justify-center gap-1 bg-white border border-ink-200 rounded-lg p-1 w-fit mx-auto mb-10 overflow-x-auto max-w-full">
+        <button *ngFor="let p of pillars" class="px-4 py-2 rounded-md text-sm font-semibold whitespace-nowrap transition"
+                [class.bg-brand-600]="activeServiceTab === p.key" [class.text-white]="activeServiceTab === p.key"
+                [class.text-ink-600]="activeServiceTab !== p.key"
+                (click)="setServiceTab(p.key)">
+          {{ p.title }}
+        </button>
+      </div>
+
+      <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
+        <div class="card p-6 hover:shadow-lg hover:-translate-y-0.5 transition" *ngFor="let s of servicesByPillar[activeServiceTab]">
+          <div class="w-11 h-11 rounded-xl bg-brand-50 text-brand-600 flex items-center justify-center mb-4">
+            <app-icon [name]="s.icon" [size]="22"></app-icon>
+          </div>
+          <h3 class="font-semibold text-ink-900 mb-1.5">{{ s.title }}</h3>
+          <p class="text-sm text-ink-600">{{ s.desc }}</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- EXPLAINABLE RISK ENGINE -->
+  <section class="py-20">
+    <div class="max-w-7xl mx-auto px-5 sm:px-8 grid lg:grid-cols-2 gap-12 items-center">
+      <div>
+        <span class="badge-green mb-4">The central risk engine</span>
+        <h2 class="text-3xl sm:text-4xl font-bold text-ink-950 mb-4">One score, three kinds of intelligence, always explainable</h2>
+        <p class="text-ink-600 mb-6">Every signal — deterministic rules, statistical/ML behaviour and relationship/network intelligence — feeds one unified risk engine. Every verdict carries a "Why?" breakdown, decomposed into contributing drivers. No unexplained black boxes.</p>
+        <div class="grid sm:grid-cols-3 gap-4">
+          <div class="card p-4">
+            <app-icon name="sliders" [size]="18" class="text-brand-600 mb-2"></app-icon>
+            <p class="text-sm font-semibold text-ink-900">Deterministic</p>
+            <p class="text-xs text-ink-500 mt-1">Rules — e.g. transaction &gt; threshold.</p>
+          </div>
+          <div class="card p-4">
+            <app-icon name="cpu" [size]="18" class="text-brand-600 mb-2"></app-icon>
+            <p class="text-sm font-semibold text-ink-900">Statistical / ML</p>
+            <p class="text-xs text-ink-500 mt-1">Behaviour — deviation from baseline.</p>
+          </div>
+          <div class="card p-4">
+            <app-icon name="network" [size]="18" class="text-brand-600 mb-2"></app-icon>
+            <p class="text-sm font-semibold text-ink-900">Relationship</p>
+            <p class="text-xs text-ink-500 mt-1">Networks — connected flagged accounts.</p>
+          </div>
+        </div>
+      </div>
+      <div class="card p-6">
+        <div class="flex items-center justify-between mb-5">
+          <div>
+            <p class="text-sm text-ink-500">Overall Risk Score</p>
+            <p class="text-4xl font-extrabold text-red-500">82<span class="text-lg text-ink-400">/100</span></p>
+          </div>
+          <span class="badge-red">High Risk — EDD Required</span>
+        </div>
+        <p class="text-xs font-semibold uppercase tracking-wide text-ink-400 mb-3">Why? Contributing drivers</p>
+        <div class="space-y-3">
+          <div *ngFor="let d of riskDrivers">
+            <div class="flex items-center justify-between text-sm mb-1">
+              <span class="text-ink-700">{{ d.label }}</span>
+              <span class="font-semibold text-ink-900">+{{ d.points }}</span>
+            </div>
+            <div class="w-full h-1.5 bg-ink-100 rounded-full overflow-hidden">
+              <div class="h-full bg-brand-600 rounded-full" [style.width.%]="d.points * 4"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- HOW IT WORKS -->
+  <section id="how-it-works" class="py-20 bg-ink-50/40">
+    <div class="max-w-7xl mx-auto px-5 sm:px-8">
+      <div class="text-center max-w-2xl mx-auto mb-14">
+        <span class="badge-green mb-4">How it works</span>
+        <h2 class="text-3xl sm:text-4xl font-bold text-ink-950">One lifecycle, from onboarding to regulator</h2>
+        <p class="mt-3 text-ink-600">The commercial strength of the platform: one institution, one system, from first KYC check through to filing with the regulator.</p>
+      </div>
+      <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-6">
+        <div *ngFor="let step of lifecycleSteps; let i = index" class="card p-5">
+          <div class="w-10 h-10 rounded-full bg-brand-600 text-white flex items-center justify-center font-bold mb-4">{{ i + 1 }}</div>
+          <h3 class="font-semibold text-ink-900 mb-1.5">{{ step.title }}</h3>
+          <p class="text-sm text-ink-600">{{ step.desc }}</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- STATS -->
+  <section class="py-16 bg-brand-700 text-white">
+    <div class="max-w-7xl mx-auto px-5 sm:px-8 grid grid-cols-2 lg:grid-cols-4 gap-8 text-center">
+      <div>
+        <p class="text-3xl sm:text-4xl font-extrabold">2.4M+</p>
+        <p class="text-brand-100 mt-1 text-sm">Verifications processed</p>
+      </div>
+      <div>
+        <p class="text-3xl sm:text-4xl font-extrabold">30</p>
+        <p class="text-brand-100 mt-1 text-sm">Compliance &amp; risk modules</p>
+      </div>
+      <div>
+        <p class="text-3xl sm:text-4xl font-extrabold">99.9%</p>
+        <p class="text-brand-100 mt-1 text-sm">Platform uptime</p>
+      </div>
+      <div>
+        <p class="text-3xl sm:text-4xl font-extrabold">6m 42s</p>
+        <p class="text-brand-100 mt-1 text-sm">Avg. verification time</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- NIGERIA & AFRICA -->
+  <section id="africa" class="py-20">
+    <div class="max-w-7xl mx-auto px-5 sm:px-8">
+      <div class="text-center max-w-2xl mx-auto mb-14">
+        <span class="badge-green mb-4">Regulatory configurability</span>
+        <h2 class="text-3xl sm:text-4xl font-bold text-ink-950">Built for Nigeria. Ready for Africa.</h2>
+        <p class="mt-3 text-ink-600">Country regulatory logic ships as a configuration pack, not hard-coded software — so the same platform can serve multiple markets.</p>
+      </div>
+      <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
+        <div class="card p-6" *ngFor="let pack of africaPacks">
+          <div class="flex items-center justify-between mb-3">
+            <h3 class="font-semibold text-ink-900">{{ pack.country }}</h3>
+            <span [ngClass]="pack.status.startsWith('Live') ? 'badge-green' : 'badge-gray'">{{ pack.status }}</span>
+          </div>
+          <p class="text-sm text-ink-600">{{ pack.detail }}</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ROLES -->
+  <section class="py-20 bg-ink-50/40">
+    <div class="max-w-7xl mx-auto px-5 sm:px-8">
+      <div class="text-center max-w-2xl mx-auto mb-14">
+        <span class="badge-green mb-4">Who uses it</span>
+        <h2 class="text-3xl sm:text-4xl font-bold text-ink-950">A workspace for every seat in the compliance function</h2>
+        <p class="mt-3 text-ink-600">Segregation of duties and maker/checker controls are enforced at the role level throughout.</p>
+      </div>
+      <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div class="card p-5" *ngFor="let r of roles">
+          <p class="font-semibold text-ink-900 mb-1">{{ r.name }}</p>
+          <p class="text-sm text-ink-600">{{ r.use }}</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- PRICING TEASER -->
+  <section id="pricing" class="py-20">
+    <div class="max-w-7xl mx-auto px-5 sm:px-8 text-center">
+      <span class="badge-green mb-4">Pricing</span>
+      <h2 class="text-3xl sm:text-4xl font-bold text-ink-950 mb-3">Plans that scale with you</h2>
+      <p class="text-ink-600 max-w-xl mx-auto mb-10">Start free, upgrade as your verification volume grows. Dedicated Cloud and On-Premise / Private Cloud available for banks with strict data-residency requirements.</p>
+      <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-5 text-left">
+        <div class="card p-6">
+          <p class="font-semibold text-ink-900">Free</p>
+          <p class="text-3xl font-extrabold my-3">$0</p>
+          <p class="text-sm text-ink-500 mb-4">25 verifications / month</p>
+          <a routerLink="/auth/register" class="btn-secondary w-full">Get Started</a>
+        </div>
+        <div class="card p-6">
+          <p class="font-semibold text-ink-900">Basic</p>
+          <p class="text-3xl font-extrabold my-3">$49<span class="text-sm font-medium text-ink-400">/mo</span></p>
+          <p class="text-sm text-ink-500 mb-4">500 verifications / month</p>
+          <a routerLink="/auth/register" class="btn-secondary w-full">Get Started</a>
+        </div>
+        <div class="card p-6 border-2 border-brand-500 relative">
+          <span class="absolute -top-3 left-6 badge-green">Most popular</span>
+          <p class="font-semibold text-ink-900">Standard</p>
+          <p class="text-3xl font-extrabold my-3">$199<span class="text-sm font-medium text-ink-400">/mo</span></p>
+          <p class="text-sm text-ink-500 mb-4">2,500 verifications / month</p>
+          <a routerLink="/auth/register" class="btn-primary w-full">Get Started</a>
+        </div>
+        <div class="card p-6">
+          <p class="font-semibold text-ink-900">Enterprise</p>
+          <p class="text-3xl font-extrabold my-3">Custom</p>
+          <p class="text-sm text-ink-500 mb-4">Dedicated Cloud or On-Premise</p>
+          <a href="#" class="btn-secondary w-full">Contact Sales</a>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- FAQ -->
+  <section id="faq" class="py-20 bg-ink-50/40">
+    <div class="max-w-3xl mx-auto px-5 sm:px-8">
+      <div class="text-center mb-12">
+        <span class="badge-green mb-4">FAQ</span>
+        <h2 class="text-3xl sm:text-4xl font-bold text-ink-950">Frequently asked questions</h2>
+      </div>
+      <div class="space-y-4">
+        <details class="card p-5 group" *ngFor="let f of faqs">
+          <summary class="font-semibold text-ink-900 cursor-pointer list-none flex items-center justify-between gap-4">
+            {{ f.q }}
+            <app-icon name="chevron-down" [size]="16" class="text-ink-400 shrink-0 group-open:rotate-180 transition-transform"></app-icon>
+          </summary>
+          <p class="text-sm text-ink-600 mt-3">{{ f.a }}</p>
+        </details>
+      </div>
+    </div>
+  </section>
+
+  <!-- CTA -->
+  <section class="py-20">
+    <div class="max-w-5xl mx-auto px-5 sm:px-8">
+      <div class="card bg-ink-950 text-white p-10 sm:p-14 text-center rounded-3xl">
+        <h2 class="text-3xl sm:text-4xl font-bold mb-4">Ready to run compliance as one system, not thirty tools?</h2>
+        <p class="text-ink-300 max-w-xl mx-auto mb-8">Join financial institutions using 360Compliance to onboard, monitor, investigate and report — with a full audit trail, end to end.</p>
+        <a routerLink="/auth/register" class="btn-primary text-base px-8 py-3 inline-flex">Create your free account</a>
+      </div>
+    </div>
+  </section>
+
+  <!-- FOOTER -->
+  <footer class="border-t border-ink-100 py-12 bg-white">
+    <div class="max-w-7xl mx-auto px-5 sm:px-8 grid sm:grid-cols-2 lg:grid-cols-5 gap-8">
+      <div class="lg:col-span-2">
+        <a routerLink="/" class="flex items-center gap-2 font-extrabold text-lg mb-3">
+          <span class="w-8 h-8 rounded-lg bg-brand-600 text-white flex items-center justify-center">
+            <app-icon name="shield" [size]="18"></app-icon>
+          </span>
+          <span>360<span class="text-brand-600">Compliance</span></span>
+        </a>
+        <p class="text-sm text-ink-500 max-w-xs">The financial crime &amp; compliance intelligence layer between your institution and the customers you serve — Nigeria-first, Africa-ready.</p>
+      </div>
+      <div>
+        <p class="font-semibold text-ink-900 mb-3 text-sm">Product</p>
+        <ul class="space-y-2 text-sm text-ink-500">
+          <li><a href="#platform" class="hover:text-brand-600">Platform</a></li>
+          <li><a href="#services" class="hover:text-brand-600">Services</a></li>
+          <li><a href="#pricing" class="hover:text-brand-600">Pricing</a></li>
+          <li><a href="#" class="hover:text-brand-600">API Docs</a></li>
+        </ul>
+      </div>
+      <div>
+        <p class="font-semibold text-ink-900 mb-3 text-sm">Company</p>
+        <ul class="space-y-2 text-sm text-ink-500">
+          <li><a href="#" class="hover:text-brand-600">About</a></li>
+          <li><a href="#" class="hover:text-brand-600">Careers</a></li>
+          <li><a href="#" class="hover:text-brand-600">Contact</a></li>
+        </ul>
+      </div>
+      <div>
+        <p class="font-semibold text-ink-900 mb-3 text-sm">Legal</p>
+        <ul class="space-y-2 text-sm text-ink-500">
+          <li><a href="#" class="hover:text-brand-600">Privacy Policy</a></li>
+          <li><a href="#" class="hover:text-brand-600">Terms of Service</a></li>
+          <li><a href="#" class="hover:text-brand-600">Security</a></li>
+        </ul>
+      </div>
+    </div>
+    <div class="max-w-7xl mx-auto px-5 sm:px-8 mt-10 pt-6 border-t border-ink-100 text-xs text-ink-400">
+      &copy; 2026 360Compliance. All rights reserved.
+    </div>
+  </footer>
+</div>

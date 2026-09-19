@@ -1,0 +1,130 @@
+<nav class="flex items-center gap-1.5 text-sm text-ink-400 mb-3">
+  <a routerLink="/app/my-compliance" class="hover:text-brand-600">My Compliance</a>
+  <app-icon name="chevron-right" [size]="14"></app-icon>
+  <span class="text-ink-700 font-medium">{{ form?.name }}</span>
+</nav>
+
+<div class="card p-6 mb-6" *ngIf="form">
+  <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+    <div>
+      <div class="flex items-center gap-2 mb-2">
+        <span class="badge-blue">{{ form.type }}</span>
+        <span *ngIf="form.status === 'live'" class="badge-green">Live</span>
+        <span *ngIf="form.status === 'draft'" class="badge-yellow">Draft</span>
+        <span *ngIf="form.status === 'in_review'" class="badge-blue">In Review</span>
+        <span *ngIf="form.status === 'paused'" class="badge-purple">Paused</span>
+        <span *ngIf="form.status === 'archived'" class="badge-gray">Archived</span>
+        <span class="badge-gray flex items-center gap-1" *ngIf="form.webhookEnabled"><app-icon name="webhook" [size]="12"></app-icon> Webhook active</span>
+      </div>
+      <h1 class="text-2xl font-bold text-ink-950">{{ form.name }}</h1>
+      <p class="muted mt-1">{{ form.sections.length }} sections &middot; {{ form.submissionsCount }} submissions</p>
+    </div>
+    <div class="flex gap-3 shrink-0">
+      <a [routerLink]="['/app/form-builder', form.id]" class="btn-secondary"><app-icon name="edit" [size]="15"></app-icon> Edit Form</a>
+      <button class="btn-primary" (click)="linkModalOpen.set(true)"><app-icon name="link" [size]="16"></app-icon> Generate KYC Link</button>
+    </div>
+  </div>
+  <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mt-6 pt-6 border-t border-ink-100">
+    <div><p class="muted">Total Submissions</p><p class="font-semibold text-ink-900 text-lg">{{ form.submissionsCount }}</p></div>
+    <div><p class="muted">Completed</p><p class="font-semibold text-ink-900 text-lg">{{ form.completedCount }}</p></div>
+    <div><p class="muted">Pending Review</p><p class="font-semibold text-amber-600 text-lg">{{ form.pendingReviewCount }}</p></div>
+    <div><p class="muted">Last Updated</p><p class="font-semibold text-ink-900 text-lg">{{ form.updatedAt }}</p></div>
+  </div>
+</div>
+
+<div class="flex flex-col sm:flex-row gap-3 mb-5">
+  <div class="relative flex-1 max-w-sm">
+    <app-icon name="search" [size]="16" class="absolute left-3 top-1/2 -translate-y-1/2 text-ink-400"></app-icon>
+    <input class="input pl-9" placeholder="Search customers..." [(ngModel)]="query"/>
+  </div>
+  <select class="input !w-auto" [(ngModel)]="statusFilter">
+    <option value="all">All Statuses</option>
+    <option value="not_started">Not Started</option>
+    <option value="in_progress">In Progress</option>
+    <option value="pending_review">Pending Review</option>
+    <option value="more_info_required">More Info Required</option>
+    <option value="approved">Approved</option>
+    <option value="rejected">Rejected</option>
+  </select>
+</div>
+
+<div class="card overflow-x-auto" *ngIf="!loading && filtered().length">
+  <table class="table">
+    <thead><tr><th>Customer</th><th>Compliance ID</th><th>Status</th><th>Risk</th><th>Progress</th><th>Started</th><th></th></tr></thead>
+    <tbody>
+      <tr *ngFor="let c of filtered()">
+        <td>
+          <div class="flex items-center gap-3">
+            <app-avatar [name]="c.fullName" [size]="32"></app-avatar>
+            <div>
+              <p class="font-medium text-ink-900">{{ c.fullName }}</p>
+              <p class="text-xs text-ink-400">{{ c.email }}</p>
+            </div>
+          </div>
+        </td>
+        <td class="text-ink-500 font-mono text-xs">{{ c.complianceId }}</td>
+        <td><span [ngClass]="statusBadgeClass(c.status)">{{ statusLabel(c.status) }}</span></td>
+        <td>
+          <span [ngClass]="c.riskLevel === 'low' ? 'badge-green' : c.riskLevel === 'medium' ? 'badge-yellow' : 'badge-red'">{{ c.riskLevel }}</span>
+        </td>
+        <td>
+          <div class="flex items-center gap-2 w-24">
+            <div class="flex-1 h-1.5 bg-ink-100 rounded-full overflow-hidden">
+              <div class="h-full bg-brand-600 rounded-full" [style.width.%]="c.progress"></div>
+            </div>
+            <span class="text-xs text-ink-500">{{ c.progress }}%</span>
+          </div>
+        </td>
+        <td class="text-ink-500 text-sm">{{ c.startedAt }}</td>
+        <td>
+          <a [routerLink]="['/app/my-compliance', formId, 'submissions', c.id]" class="btn-secondary btn-sm">Review</a>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="card" *ngIf="!loading && !filtered().length">
+  <app-empty-state icon="clients" title="No customers yet" subtitle="Generate a compliance link to start onboarding customers to this form.">
+    <button class="btn-primary" (click)="linkModalOpen.set(true)"><app-icon name="link" [size]="16"></app-icon> Generate KYC Link</button>
+  </app-empty-state>
+</div>
+
+<div *ngIf="loading" class="flex items-center justify-center py-24 text-ink-400">Loading...</div>
+
+<app-modal [open]="linkModalOpen()" title="Generate Compliance Link" subtitle="Create a secure KYC/KYB link for a new customer." (close)="closeLinkModal()">
+  <div *ngIf="!generatedLink()" class="space-y-4">
+    <div>
+      <label class="label">Customer full name</label>
+      <input class="input" [(ngModel)]="newCustomerName" placeholder="e.g. Jane Doe"/>
+    </div>
+    <div>
+      <label class="label">Customer email (optional)</label>
+      <input class="input" [(ngModel)]="newCustomerEmail" placeholder="jane@example.com"/>
+    </div>
+    <p class="text-xs text-ink-400">A unique compliance ID and password will be sent to this customer's email so they can start or resume their {{ form?.type }} process.</p>
+  </div>
+
+  <div *ngIf="generatedLink()" class="space-y-4">
+    <div class="rounded-lg bg-brand-50 p-4 text-center">
+      <app-icon name="check-circle" [size]="28" class="text-brand-600 mx-auto mb-2"></app-icon>
+      <p class="font-medium text-ink-900">Link generated successfully</p>
+      <p class="text-xs text-ink-500 mt-1">Compliance ID: <span class="font-mono font-semibold">{{ generatedLink()?.complianceId }}</span></p>
+    </div>
+    <div>
+      <label class="label">Shareable KYC/KYB Link</label>
+      <div class="flex gap-2">
+        <input class="input font-mono text-xs" [value]="generatedLink()?.link" readonly/>
+        <button class="btn-secondary shrink-0" (click)="copyLink()">
+          <app-icon [name]="copied() ? 'check' : 'copy'" [size]="16"></app-icon>
+        </button>
+      </div>
+    </div>
+    <p class="text-xs text-ink-400">Alternatively, call our API endpoint <span class="font-mono bg-ink-100 px-1.5 py-0.5 rounded">POST /v1/compliance-links</span> to generate this link programmatically from your own application.</p>
+  </div>
+
+  <div modal-footer class="flex gap-3 w-full sm:w-auto">
+    <button class="btn-secondary flex-1" (click)="closeLinkModal()">{{ generatedLink() ? 'Done' : 'Cancel' }}</button>
+    <button *ngIf="!generatedLink()" class="btn-primary flex-1" [disabled]="!newCustomerName.trim()" (click)="generateLink()">Generate Link</button>
+  </div>
+</app-modal>

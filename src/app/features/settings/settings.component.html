@@ -1,0 +1,143 @@
+<app-page-header title="Settings" subtitle="Configure your company branding, security and notification preferences."></app-page-header>
+
+<div class="flex items-center bg-ink-100 rounded-lg p-1 w-fit mb-6">
+  <button class="px-4 py-2 rounded-md text-sm font-medium" [class.bg-white]="activeTab === 'company'" [class.shadow-sm]="activeTab === 'company'" (click)="activeTab = 'company'">Company Profile</button>
+  <button class="px-4 py-2 rounded-md text-sm font-medium" [class.bg-white]="activeTab === 'security'" [class.shadow-sm]="activeTab === 'security'" (click)="activeTab = 'security'">Security</button>
+  <button class="px-4 py-2 rounded-md text-sm font-medium" [class.bg-white]="activeTab === 'notifications'" [class.shadow-sm]="activeTab === 'notifications'" (click)="activeTab = 'notifications'">Notifications</button>
+</div>
+
+<!-- COMPANY -->
+<div *ngIf="activeTab === 'company' && company" class="max-w-3xl space-y-5">
+  <div class="card p-6">
+    <h3 class="font-semibold text-ink-900 mb-1">Branding</h3>
+    <p class="muted mb-5">Your logo and company name appear on every KYC/KYB form your customers fill out.</p>
+    <div class="flex items-center gap-5">
+      <div class="w-20 h-20 rounded-xl border border-ink-100 flex items-center justify-center overflow-hidden bg-ink-50 shrink-0">
+        <img *ngIf="logoPreview" [src]="logoPreview" class="w-full h-full object-cover"/>
+        <app-icon *ngIf="!logoPreview" name="building" [size]="28" class="text-ink-300"></app-icon>
+      </div>
+      <div>
+        <label class="btn-secondary btn-sm cursor-pointer inline-flex">
+          <app-icon name="upload" [size]="14"></app-icon> Upload Logo
+          <input type="file" accept="image/*" class="hidden" (change)="onLogoSelected($event)"/>
+        </label>
+        <p class="text-xs text-ink-400 mt-2">PNG or SVG, at least 256x256px, transparent background recommended.</p>
+      </div>
+    </div>
+    <div class="mt-5">
+      <label class="label">Brand Color</label>
+      <div class="flex items-center gap-3">
+        <input type="color" class="w-12 h-10 rounded-lg border border-ink-200 cursor-pointer" [(ngModel)]="company.brandColor"/>
+        <input class="input !w-40 font-mono" [(ngModel)]="company.brandColor"/>
+      </div>
+    </div>
+  </div>
+
+  <div class="card p-6">
+    <h3 class="font-semibold text-ink-900 mb-5">Company Information</h3>
+    <div class="grid sm:grid-cols-2 gap-4">
+      <div>
+        <label class="label">Display Name</label>
+        <input class="input" [(ngModel)]="company.name"/>
+      </div>
+      <div>
+        <label class="label">Legal Name</label>
+        <input class="input" [(ngModel)]="company.legalName"/>
+      </div>
+      <div>
+        <label class="label">Website</label>
+        <input class="input" [(ngModel)]="company.website"/>
+      </div>
+      <div>
+        <label class="label">Support Email</label>
+        <input class="input" [(ngModel)]="company.supportEmail"/>
+      </div>
+      <div>
+        <label class="label">Industry</label>
+        <input class="input" [(ngModel)]="company.industry"/>
+      </div>
+      <div>
+        <label class="label">Country</label>
+        <input class="input" [(ngModel)]="company.country"/>
+      </div>
+      <div class="sm:col-span-2">
+        <label class="label">Registered Address</label>
+        <textarea class="input" rows="2" [(ngModel)]="company.address"></textarea>
+      </div>
+    </div>
+  </div>
+
+  <div class="card p-6">
+    <h3 class="font-semibold text-ink-900 mb-1">KYC Form Preview</h3>
+    <p class="muted mb-4">This is how your branding will appear to customers.</p>
+    <div class="border border-ink-100 rounded-xl p-6 bg-ink-50/50 text-center">
+      <div class="w-14 h-14 rounded-xl mx-auto mb-3 flex items-center justify-center overflow-hidden" [style.background]="logoPreview ? 'transparent' : company.brandColor">
+        <img *ngIf="logoPreview" [src]="logoPreview" class="w-full h-full object-cover rounded-xl"/>
+        <app-icon *ngIf="!logoPreview" name="building" [size]="22" class="text-white"></app-icon>
+      </div>
+      <p class="font-semibold text-ink-900">{{ company.name }}</p>
+      <p class="text-xs text-ink-500 mt-1">Identity Verification powered by 360Compliance</p>
+    </div>
+  </div>
+
+  <div class="flex justify-end gap-3">
+    <span *ngIf="saved()" class="text-sm text-brand-600 self-center">Saved!</span>
+    <button class="btn-primary" [disabled]="saving" (click)="save()">{{ saving ? 'Saving...' : 'Save Changes' }}</button>
+  </div>
+</div>
+
+<!-- SECURITY -->
+<div *ngIf="activeTab === 'security'" class="max-w-2xl space-y-5">
+  <div class="card p-6">
+    <div class="flex items-center justify-between">
+      <div>
+        <h3 class="font-semibold text-ink-900">Two-Factor Authentication</h3>
+        <p class="muted mt-1">Require a 6-digit email code at every sign-in.</p>
+      </div>
+      <button class="relative w-12 h-7 rounded-full transition shrink-0" [class.bg-brand-600]="twoFactorEnabled" [class.bg-ink-200]="!twoFactorEnabled" (click)="twoFactorEnabled = !twoFactorEnabled">
+        <span class="absolute top-1 w-5 h-5 rounded-full bg-white transition-all" [class.left-6]="twoFactorEnabled" [class.left-1]="!twoFactorEnabled"></span>
+      </button>
+    </div>
+  </div>
+
+  <div class="card p-6">
+    <h3 class="font-semibold text-ink-900 mb-4">Change Password</h3>
+    <div class="space-y-3">
+      <div><label class="label">Current Password</label><input class="input" type="password" placeholder="••••••••"/></div>
+      <div><label class="label">New Password</label><input class="input" type="password" placeholder="••••••••"/></div>
+      <div><label class="label">Confirm New Password</label><input class="input" type="password" placeholder="••••••••"/></div>
+    </div>
+    <button class="btn-primary mt-4">Update Password</button>
+  </div>
+
+  <div class="card p-6 border border-red-100">
+    <h3 class="font-semibold text-red-600 mb-1">Danger Zone</h3>
+    <p class="muted mb-4">Deleting your workspace is permanent and cannot be undone.</p>
+    <button class="btn-danger">Delete Workspace</button>
+  </div>
+</div>
+
+<!-- NOTIFICATIONS -->
+<div *ngIf="activeTab === 'notifications'" class="max-w-2xl">
+  <div class="card p-6 space-y-4">
+    <label class="flex items-center justify-between py-2">
+      <div><p class="text-sm font-medium text-ink-900">New submission received</p><p class="text-xs text-ink-400">Get notified when a customer completes verification.</p></div>
+      <input type="checkbox" [(ngModel)]="notifPrefs.newSubmission" class="rounded border-ink-300 text-brand-600 w-5 h-5"/>
+    </label>
+    <label class="flex items-center justify-between py-2 border-t border-ink-50">
+      <div><p class="text-sm font-medium text-ink-900">High-risk match found</p><p class="text-xs text-ink-400">Immediate alert for sanctions/PEP matches.</p></div>
+      <input type="checkbox" [(ngModel)]="notifPrefs.highRisk" class="rounded border-ink-300 text-brand-600 w-5 h-5"/>
+    </label>
+    <label class="flex items-center justify-between py-2 border-t border-ink-50">
+      <div><p class="text-sm font-medium text-ink-900">Weekly compliance digest</p><p class="text-xs text-ink-400">Summary of activity sent every Monday.</p></div>
+      <input type="checkbox" [(ngModel)]="notifPrefs.weeklyDigest" class="rounded border-ink-300 text-brand-600 w-5 h-5"/>
+    </label>
+    <label class="flex items-center justify-between py-2 border-t border-ink-50">
+      <div><p class="text-sm font-medium text-ink-900">Webhook delivery failures</p><p class="text-xs text-ink-400">Alert when webhook events fail to deliver.</p></div>
+      <input type="checkbox" [(ngModel)]="notifPrefs.webhookFailures" class="rounded border-ink-300 text-brand-600 w-5 h-5"/>
+    </label>
+  </div>
+  <div class="flex justify-end mt-4">
+    <button class="btn-primary">Save Preferences</button>
+  </div>
+</div>

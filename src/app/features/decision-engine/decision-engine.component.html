@@ -1,0 +1,68 @@
+<app-page-header title="Risk Appetite & Decision Engine" subtitle="Configure your own approval matrix — each risk tier routes to the right approver and action automatically.">
+</app-page-header>
+
+<div class="fixed bottom-6 right-6 z-40 bg-ink-900 text-white text-sm px-4 py-3 rounded-lg shadow-lg fade-in" *ngIf="saved()">
+  Approval matrix updated.
+</div>
+
+<div class="card overflow-x-auto" *ngIf="!loading">
+  <table class="table">
+    <thead><tr><th>Risk Level</th><th>Approver</th><th>Action</th><th>SLA (hours)</th><th></th></tr></thead>
+    <tbody>
+      <tr *ngFor="let t of matrix">
+        <td><span [ngClass]="levelBadge(t.riskLevel)">{{ t.riskLevel }}</span></td>
+        <td>
+          <select class="input !w-auto" [(ngModel)]="t.approver">
+            <option *ngFor="let a of approvers" [value]="a">{{ a }}</option>
+          </select>
+        </td>
+        <td class="text-sm text-ink-600 max-w-xs">
+          <input class="input" [(ngModel)]="t.action"/>
+        </td>
+        <td class="w-28">
+          <input class="input" type="number" min="0" [(ngModel)]="t.slaHours"/>
+        </td>
+        <td><button class="btn-secondary btn-sm" (click)="save(t)">Save</button></td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<div *ngIf="loading" class="flex items-center justify-center py-24 text-ink-400">Loading approval matrix...</div>
+
+<div class="card p-5 mt-6 flex items-start gap-3">
+  <app-icon name="sliders" [size]="18" class="text-brand-600 shrink-0 mt-0.5"></app-icon>
+  <p class="text-sm text-ink-600">This matrix drives automated routing at onboarding and EDD approval — each institution sets its own thresholds rather than inheriting one universal policy.</p>
+</div>
+
+<div class="grid lg:grid-cols-3 gap-6 mt-6" *ngIf="!loading">
+  <div class="lg:col-span-2 card p-6">
+    <h3 class="font-semibold text-ink-900 mb-1">Decision Simulator</h3>
+    <p class="muted mb-5">Model a hypothetical customer to preview which approval route the current matrix would apply.</p>
+    <div class="space-y-4">
+      <div>
+        <div class="flex items-center justify-between text-sm mb-1">
+          <span class="text-ink-600">Residual Risk Score</span>
+          <span class="font-medium text-ink-800">{{ simScore }}</span>
+        </div>
+        <input type="range" min="0" max="100" class="w-full accent-brand-600" [(ngModel)]="simScore"/>
+      </div>
+      <label class="flex items-center gap-2 text-sm text-ink-700">
+        <input type="checkbox" [(ngModel)]="simSanctionsConfirmed"/> Sanctions match confirmed
+      </label>
+      <label class="flex items-center gap-2 text-sm text-ink-700">
+        <input type="checkbox" [(ngModel)]="simInvestigationPending" [disabled]="simSanctionsConfirmed"/> Investigation pending (case open)
+      </label>
+    </div>
+  </div>
+
+  <div class="card p-6">
+    <p class="text-xs font-semibold uppercase tracking-wide text-ink-400 mb-2">Resulting Route</p>
+    <span [ngClass]="levelBadge(simulatedTierLabel())" class="mb-4 inline-block">{{ simulatedTierLabel() }}</span>
+    <div class="space-y-2 text-sm" *ngIf="simulatedRoute() as route">
+      <div><p class="text-ink-400 text-xs">Approver</p><p class="font-medium text-ink-900">{{ route.approver }}</p></div>
+      <div><p class="text-ink-400 text-xs">Action</p><p class="font-medium text-ink-900">{{ route.action }}</p></div>
+      <div><p class="text-ink-400 text-xs">SLA</p><p class="font-medium text-ink-900">{{ route.slaHours }} hours</p></div>
+    </div>
+  </div>
+</div>

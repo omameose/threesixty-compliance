@@ -1,0 +1,130 @@
+<app-page-header title="Compliance Rules Studio" subtitle="Configure thresholds, risk weights and alert rules yourself — no developer deployment required.">
+</app-page-header>
+
+<div class="fixed bottom-6 right-6 z-40 bg-ink-900 text-white text-sm px-4 py-3 rounded-lg shadow-lg fade-in" *ngIf="saved()">
+  Rule configuration saved.
+</div>
+
+<div class="flex items-center gap-1 bg-ink-100 rounded-lg p-1 w-fit mb-5 overflow-x-auto">
+  <button *ngFor="let m of modules()" class="px-3 py-1.5 rounded-md text-sm font-medium whitespace-nowrap"
+          [class.bg-white]="moduleFilter === m" [class.shadow-sm]="moduleFilter === m" (click)="moduleFilter = m">{{ m }}</button>
+</div>
+
+<div class="space-y-4" *ngIf="!loading">
+  <div class="card p-5" *ngFor="let r of filtered()">
+    <div class="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+      <div class="flex-1 min-w-0">
+        <div class="flex items-center gap-2 flex-wrap mb-1">
+          <h3 class="font-semibold text-ink-900">{{ r.name }}</h3>
+          <span class="badge-blue">{{ r.module }}</span>
+          <span [ngClass]="severityBadge(r.severity)">{{ r.severity }}</span>
+          <span [ngClass]="r.enabled ? 'badge-green' : 'badge-gray'">{{ r.enabled ? 'Active' : 'Disabled' }}</span>
+          <span class="text-xs text-ink-400 font-mono">v{{ r.version }}</span>
+        </div>
+        <p class="text-sm text-ink-600 mb-1">{{ r.description }}</p>
+        <p class="text-xs text-ink-400 font-mono">{{ r.parameter }}</p>
+      </div>
+      <div class="flex items-center gap-3 shrink-0">
+        <div *ngIf="r.weight > 0" class="text-center">
+          <p class="text-xs text-ink-400 mb-1">Weight</p>
+          <input class="input !w-20 text-center" type="number" min="0" max="100" [(ngModel)]="r.weight" (change)="updateWeight(r, r.weight)"/>
+        </div>
+        <button class="btn-secondary btn-sm" (click)="openBuilder(r)"><app-icon name="edit" [size]="14"></app-icon> Edit</button>
+        <button class="relative w-11 h-6 rounded-full transition-colors shrink-0" [class.bg-brand-600]="r.enabled" [class.bg-ink-200]="!r.enabled" (click)="toggle(r)" title="Enable / disable rule">
+          <span class="absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform" [class.translate-x-5]="r.enabled"></span>
+        </button>
+      </div>
+    </div>
+    <p class="text-xs text-ink-400 mt-3">Last modified {{ r.lastModified }} &middot; Action: {{ r.action }}</p>
+  </div>
+</div>
+
+<div *ngIf="loading" class="flex items-center justify-center py-24 text-ink-400">Loading rules...</div>
+
+<!-- WHEN -> AND/OR -> THEN -> ACTION BUILDER -->
+<app-modal [open]="builderOpen()" [title]="'Edit Rule — ' + (editingRule()?.name || '')" widthClass="max-w-2xl" (close)="builderOpen.set(false)">
+  <div class="space-y-6" *ngIf="editingRule() as r">
+    <div>
+      <p class="text-xs font-semibold uppercase tracking-wide text-ink-400 mb-2">WHEN</p>
+      <div class="space-y-2">
+        <div class="grid grid-cols-12 gap-2 items-center" *ngFor="let cond of builderConditions; let i = index">
+          <input class="input col-span-4" [(ngModel)]="cond.field" placeholder="field (e.g. transaction_count_24h)"/>
+          <select class="input col-span-2" [(ngModel)]="cond.operator">
+            <option *ngFor="let op of operators" [value]="op">{{ op }}</option>
+          </select>
+          <input class="input col-span-3" [(ngModel)]="cond.value" placeholder="value"/>
+          <select class="input col-span-2" [(ngModel)]="cond.logic" *ngIf="i < builderConditions.length - 1">
+            <option value="AND">AND</option>
+            <option value="OR">OR</option>
+          </select>
+          <span class="col-span-2 text-xs text-ink-300 text-center" *ngIf="i === builderConditions.length - 1">(last)</span>
+          <button class="col-span-1 text-red-400 hover:text-red-600 justify-self-end" (click)="removeCondition(i)"><app-icon name="trash" [size]="15"></app-icon></button>
+        </div>
+      </div>
+      <button class="btn-secondary btn-sm mt-2" (click)="addCondition()"><app-icon name="plus" [size]="14"></app-icon> Add Condition</button>
+    </div>
+
+    <div class="grid grid-cols-2 gap-4">
+      <div>
+        <p class="text-xs font-semibold uppercase tracking-wide text-ink-400 mb-2">THEN — ACTION</p>
+        <input class="input" [(ngModel)]="builderAction" placeholder="e.g. Raise high-severity alert"/>
+      </div>
+      <div>
+        <p class="text-xs font-semibold uppercase tracking-wide text-ink-400 mb-2">Alert Severity</p>
+        <select class="input" [(ngModel)]="builderSeverity">
+          <option value="low">Low</option>
+          <option value="medium">Medium</option>
+          <option value="high">High</option>
+          <option value="critical">Critical</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="rounded-lg bg-ink-50 p-4">
+      <p class="text-xs font-semibold uppercase tracking-wide text-ink-400 mb-3">Test / Simulate</p>
+      <div class="space-y-2 mb-3">
+        <div class="flex items-center gap-2 text-sm" *ngFor="let cond of builderConditions; let i = index">
+          <span class="text-ink-600 w-40 truncate">{{ cond.field || '(field)' }} {{ cond.operator }} {{ cond.value }}</span>
+          <input class="input !py-1.5" [(ngModel)]="simValues[i]" placeholder="test value"/>
+        </div>
+      </div>
+      <button class="btn-secondary btn-sm" (click)="runSimulation()">Run Simulation</button>
+
+      <div class="mt-3" *ngIf="simResult() as sim">
+        <div class="flex items-center gap-2 mb-2">
+          <app-icon [name]="sim.passed ? 'check-circle' : 'x-circle'" [size]="16" [class.text-brand-600]="sim.passed" [class.text-red-500]="!sim.passed"></app-icon>
+          <span class="font-semibold text-sm" [ngClass]="sim.passed ? 'text-brand-700' : 'text-red-600'">{{ sim.passed ? 'Rule WOULD trigger' : 'Rule would NOT trigger' }}</span>
+        </div>
+        <ul class="space-y-1 text-xs">
+          <li *ngFor="let b of sim.breakdown" class="flex items-center gap-1.5" [ngClass]="b.passed ? 'text-ink-600' : 'text-ink-400'">
+            <app-icon [name]="b.passed ? 'check' : 'x'" [size]="11"></app-icon> {{ b.text }}
+          </li>
+        </ul>
+      </div>
+    </div>
+
+    <div>
+      <button class="text-sm text-ink-500 hover:text-ink-700 flex items-center gap-1 mb-2" (click)="showVersionHistory.set(!showVersionHistory())">
+        <app-icon [name]="showVersionHistory() ? 'chevron-up' : 'chevron-down'" [size]="14"></app-icon> Version History ({{ r.versionHistory.length }})
+      </button>
+      <div class="space-y-2 fade-in" *ngIf="showVersionHistory()">
+        <div class="flex items-start gap-3 text-sm" *ngFor="let v of r.versionHistory">
+          <span class="badge-gray shrink-0">v{{ v.version }}</span>
+          <div>
+            <p class="text-ink-700">{{ v.summary }}</p>
+            <p class="text-xs text-ink-400">{{ v.modifiedBy }} &middot; {{ v.date }}</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div>
+      <label class="label">Change Summary (required to publish)</label>
+      <input class="input" [(ngModel)]="builderSummary" placeholder="e.g. Loosened threshold to reduce false positives"/>
+    </div>
+  </div>
+  <div modal-footer class="flex gap-3 w-full sm:w-auto">
+    <button class="btn-secondary flex-1" (click)="builderOpen.set(false)">Cancel</button>
+    <button class="btn-primary flex-1" [disabled]="!builderSummary.trim()" (click)="publish()">Publish New Version</button>
+  </div>
+</app-modal>

@@ -1,0 +1,138 @@
+<app-page-header title="Document Verification" subtitle="OCR, template validation and image-forensics to detect tampering and confirm document authenticity.">
+  <button class="btn-primary" (click)="uploadModalOpen.set(true); newCustomerName=''; newDocumentType=''"><app-icon name="upload" [size]="16"></app-icon> Upload Document</button>
+</app-page-header>
+
+<div class="fixed bottom-6 right-6 z-40 bg-ink-900 text-white text-sm px-4 py-3 rounded-lg shadow-lg fade-in" *ngIf="toast()">{{ toast() }}</div>
+
+<div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+  <div class="card p-5"><p class="muted mb-1">Verified</p><p class="text-2xl font-bold text-brand-600">{{ countByOutcome('VERIFIED') }}</p></div>
+  <div class="card p-5"><p class="muted mb-1">Review Required</p><p class="text-2xl font-bold text-amber-600">{{ countByOutcome('REVIEW_REQUIRED') }}</p></div>
+  <div class="card p-5"><p class="muted mb-1">Failed</p><p class="text-2xl font-bold text-red-500">{{ countByOutcome('FAILED') }}</p></div>
+  <div class="card p-5"><p class="muted mb-1">Total Processed</p><p class="text-2xl font-bold text-ink-900">{{ records.length }}</p></div>
+</div>
+
+<div class="grid lg:grid-cols-5 gap-5" *ngIf="!loading">
+  <div class="lg:col-span-3 space-y-4">
+    <div class="flex flex-col sm:flex-row gap-3">
+      <div class="relative flex-1">
+        <app-icon name="search" [size]="16" class="absolute left-3 top-1/2 -translate-y-1/2 text-ink-400"></app-icon>
+        <input class="input pl-9" placeholder="Search by customer name..." [(ngModel)]="query"/>
+      </div>
+      <select class="input !w-auto" [(ngModel)]="outcomeFilter">
+        <option value="all">All outcomes</option>
+        <option value="VERIFIED">Verified</option>
+        <option value="REVIEW_REQUIRED">Review Required</option>
+        <option value="FAILED">Failed</option>
+      </select>
+    </div>
+
+    <div class="card overflow-x-auto">
+      <table class="table">
+        <thead><tr><th>Customer</th><th>Document Type</th><th>Country</th><th>Outcome</th><th>Authenticity</th><th>Date</th></tr></thead>
+        <tbody>
+          <tr *ngFor="let r of filtered()" class="cursor-pointer" [class.bg-brand-50]="selected()?.id === r.id" (click)="select(r)">
+            <td class="font-medium text-ink-900">{{ r.customerName }}</td>
+            <td class="text-sm text-ink-600">{{ r.documentType }}</td>
+            <td class="text-sm text-ink-600">{{ r.issuingCountry }}</td>
+            <td><span [ngClass]="outcomeBadge(r.outcome)">{{ r.outcome.replace('_',' ') }}</span></td>
+            <td>
+              <div class="flex items-center gap-2 w-20">
+                <div class="flex-1 h-1.5 bg-ink-100 rounded-full overflow-hidden">
+                  <div class="h-full rounded-full" [ngClass]="r.authenticityScore >= 85 ? 'bg-brand-600' : r.authenticityScore >= 60 ? 'bg-amber-500' : 'bg-red-500'" [style.width.%]="r.authenticityScore"></div>
+                </div>
+                <span class="text-xs text-ink-500">{{ r.authenticityScore }}%</span>
+              </div>
+            </td>
+            <td class="text-sm text-ink-500 whitespace-nowrap">{{ r.checkedAt }}</td>
+          </tr>
+        </tbody>
+      </table>
+      <div *ngIf="!filtered().length" class="py-10 text-center text-sm text-ink-400">No records match your filters.</div>
+    </div>
+  </div>
+
+  <div class="lg:col-span-2">
+    <div class="card p-5 sticky top-6" *ngIf="selected() as r">
+      <div class="flex items-start justify-between mb-4">
+        <div>
+          <h3 class="font-semibold text-ink-900 text-lg">{{ r.customerName }}</h3>
+          <p class="text-xs text-ink-400">{{ r.documentType }} &middot; {{ r.issuingCountry }}</p>
+        </div>
+        <span [ngClass]="outcomeBadge(r.outcome)">{{ r.outcome.replace('_',' ') }}</span>
+      </div>
+
+      <div class="grid grid-cols-2 gap-3 text-sm mb-4">
+        <div><p class="text-ink-400 text-xs">Authenticity Score</p><p class="font-semibold text-ink-900">{{ r.authenticityScore }}%</p></div>
+        <div><p class="text-ink-400 text-xs">Provider</p><p class="font-medium text-ink-800">{{ r.provider }}</p></div>
+        <div *ngIf="r.expiryDate"><p class="text-ink-400 text-xs">Expiry Date</p><p class="font-medium text-ink-800">{{ r.expiryDate }}</p></div>
+        <div><p class="text-ink-400 text-xs">Document No.</p><p class="font-mono text-xs text-ink-700">{{ r.documentNumber }}</p></div>
+      </div>
+
+      <div class="rounded-lg bg-ink-50 p-4 mb-4" *ngIf="r.extractedFields.length">
+        <p class="text-xs font-semibold uppercase tracking-wide text-ink-400 mb-2">Extracted Fields</p>
+        <div class="space-y-1.5 text-sm">
+          <div class="flex justify-between items-center" *ngFor="let f of r.extractedFields">
+            <span class="text-ink-500">{{ f.label }}</span>
+            <span class="flex items-center gap-1.5 font-medium" [ngClass]="f.matchesSubmitted ? 'text-ink-900' : 'text-red-600'">
+              {{ f.value }}
+              <app-icon [name]="f.matchesSubmitted ? 'check' : 'x'" [size]="12"></app-icon>
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <div class="rounded-lg bg-red-50 p-4 mb-4" *ngIf="r.tamperIndicators.length">
+        <p class="text-xs font-semibold uppercase tracking-wide text-red-500 mb-2">Tamper Indicators</p>
+        <ul class="space-y-1 text-sm text-red-700">
+          <li *ngFor="let t of r.tamperIndicators">&bull; {{ t }}</li>
+        </ul>
+      </div>
+
+      <div class="rounded-lg bg-amber-50 p-4 mb-4" *ngIf="r.anomalies.length">
+        <p class="text-xs font-semibold uppercase tracking-wide text-amber-600 mb-2">Anomalies</p>
+        <ul class="space-y-1 text-sm text-amber-700">
+          <li *ngFor="let a of r.anomalies">&bull; {{ a }}</li>
+        </ul>
+      </div>
+
+      <div class="grid grid-cols-3 gap-2 mb-5">
+        <button class="btn-primary btn-sm justify-center" [disabled]="r.outcome === 'VERIFIED'" (click)="setOutcome('VERIFIED')">Approve</button>
+        <button class="btn-secondary btn-sm justify-center" [disabled]="r.outcome === 'REVIEW_REQUIRED'" (click)="setOutcome('REVIEW_REQUIRED')">Request New Doc</button>
+        <button class="btn-danger btn-sm justify-center" [disabled]="r.outcome === 'FAILED'" (click)="setOutcome('FAILED')">Reject</button>
+      </div>
+
+      <app-notes-panel [notes]="r.notes" (addNote)="addNote($event)"></app-notes-panel>
+    </div>
+
+    <div class="card" *ngIf="!selected()">
+      <app-empty-state icon="file-check" title="Select a document" subtitle="Click a row on the left to review extracted fields, tamper indicators and anomalies."></app-empty-state>
+    </div>
+  </div>
+</div>
+
+<div *ngIf="loading" class="flex items-center justify-center py-24 text-ink-400">Loading document verification queue...</div>
+
+<app-modal [open]="uploadModalOpen()" title="Upload Document for Verification" (close)="uploadModalOpen.set(false)">
+  <div class="space-y-4" *ngIf="!processing()">
+    <div>
+      <label class="label">Customer Name</label>
+      <input class="input" [(ngModel)]="newCustomerName" placeholder="e.g. Chidinma Okeke"/>
+    </div>
+    <div>
+      <label class="label">Document Type</label>
+      <select class="input" [(ngModel)]="newDocumentType">
+        <option value="">Select document type</option>
+        <option *ngFor="let t of documentTypes" [value]="t">{{ t }}</option>
+      </select>
+    </div>
+    <div class="border-2 border-dashed border-ink-200 rounded-xl p-8 text-center text-ink-400">
+      <app-icon name="upload" [size]="28" class="mx-auto mb-2"></app-icon>
+      <p class="text-sm font-medium text-ink-600">Click Verify below to simulate upload &amp; processing</p>
+    </div>
+  </div>
+  <div *ngIf="processing()" class="text-center py-10 text-ink-500 text-sm">Running OCR, template validation and tamper detection...</div>
+  <div modal-footer class="flex gap-3 w-full sm:w-auto" *ngIf="!processing()">
+    <button class="btn-secondary flex-1" (click)="uploadModalOpen.set(false)">Cancel</button>
+    <button class="btn-primary flex-1" [disabled]="!newCustomerName.trim() || !newDocumentType" (click)="runUpload()">Verify Document</button>
+  </div>
+</app-modal>

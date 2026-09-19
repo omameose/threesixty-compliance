@@ -1,0 +1,66 @@
+<app-auth-shell headline="Create your compliance workspace." sub="Set up your company profile and start onboarding customers with confidence.">
+  <div class="flex items-center gap-2 mb-6">
+    <div class="flex items-center gap-2 flex-1">
+      <div class="h-1.5 flex-1 rounded-full" [class.bg-brand-600]="step >= 1" [class.bg-ink-200]="step < 1"></div>
+      <div class="h-1.5 flex-1 rounded-full" [class.bg-brand-600]="step >= 2" [class.bg-ink-200]="step < 2"></div>
+    </div>
+    <span class="text-xs text-ink-400 font-medium">Step {{ step }} of 2</span>
+  </div>
+
+  <h1 class="text-2xl font-bold text-ink-950 mb-1">Create your account</h1>
+  <p class="muted mb-7">{{ step === 1 ? 'Tell us about your business' : 'Set up your admin login' }}</p>
+
+  <form [formGroup]="form" (ngSubmit)="submit()" class="space-y-4">
+    <ng-container *ngIf="step === 1">
+      <div>
+        <label class="label">Company name</label>
+        <input class="input" formControlName="companyName" placeholder="e.g. PayFlux Technologies"/>
+      </div>
+      <div>
+        <label class="label">Industry</label>
+        <select class="input" formControlName="industry">
+          <option>Payment Gateway</option>
+          <option>Fintech</option>
+          <option>Commercial Bank</option>
+          <option>Insurance</option>
+          <option>Healthcare</option>
+          <option>Education</option>
+          <option>E-commerce / Marketplace</option>
+          <option>Logistics</option>
+          <option>Other</option>
+        </select>
+      </div>
+      <button type="button" class="btn-primary w-full py-3" (click)="nextStep()">Continue</button>
+    </ng-container>
+
+    <ng-container *ngIf="step === 2">
+      <div>
+        <label class="label">Full name</label>
+        <input class="input" formControlName="fullName" placeholder="Your full name"/>
+      </div>
+      <div>
+        <label class="label">Work email</label>
+        <input class="input" type="email" formControlName="email" placeholder="you@company.com"/>
+      </div>
+      <div>
+        <label class="label">Password</label>
+        <input class="input" type="password" formControlName="password" placeholder="Minimum 8 characters"/>
+      </div>
+      <label class="flex items-start gap-2 text-sm text-ink-600">
+        <input type="checkbox" formControlName="agree" class="mt-0.5 rounded border-ink-300 text-brand-600 focus:ring-brand-500"/>
+        I agree to the <a href="#" class="text-brand-600 hover:underline mx-1">Terms of Service</a> and <a href="#" class="text-brand-600 hover:underline ml-1">Privacy Policy</a>
+      </label>
+      <div class="flex gap-3">
+        <button type="button" class="btn-secondary flex-1 py-3" (click)="step = 1">Back</button>
+        <button type="submit" class="btn-primary flex-1 py-3" [disabled]="loading">
+          <span *ngIf="!loading">Create account</span>
+          <span *ngIf="loading">Creating...</span>
+        </button>
+      </div>
+    </ng-container>
+  </form>
+
+  <p class="text-center text-sm text-ink-500 mt-6">
+    Already have an account? <a routerLink="/auth/login" class="text-brand-600 font-medium hover:underline">Sign in</a>
+  </p>
+</app-auth-shell>

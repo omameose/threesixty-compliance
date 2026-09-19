@@ -1,0 +1,73 @@
+<app-page-header title="Model Governance & AI Governance" subtitle="Every model tracked against precision, recall, false-positive rate and population stability — AI sits on top of deterministic controls, never as a black box.">
+</app-page-header>
+
+<div class="space-y-4" *ngIf="!loading">
+  <div class="card p-5" *ngFor="let m of models">
+    <div class="flex flex-col sm:flex-row sm:items-start justify-between gap-4 mb-4">
+      <div>
+        <div class="flex items-center gap-2 flex-wrap mb-1">
+          <h3 class="font-semibold text-ink-900">{{ m.name }}</h3>
+          <span class="badge-gray font-mono">{{ m.version }}</span>
+          <span [ngClass]="statusBadge(m.status)">{{ m.status.replace('_',' ') }}</span>
+        </div>
+        <p class="text-sm text-ink-600">{{ m.purpose }}</p>
+        <p class="text-xs text-ink-400 mt-1">Owner: {{ m.owner }} &middot; Last validated {{ m.lastValidated }}</p>
+      </div>
+    </div>
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div class="rounded-lg bg-ink-50 p-3">
+        <p class="text-xs text-ink-500">Precision</p>
+        <p class="text-lg font-bold text-ink-900">{{ pct(m.precision) }}</p>
+      </div>
+      <div class="rounded-lg bg-ink-50 p-3">
+        <p class="text-xs text-ink-500">Recall</p>
+        <p class="text-lg font-bold text-ink-900">{{ pct(m.recall) }}</p>
+      </div>
+      <div class="rounded-lg bg-ink-50 p-3">
+        <p class="text-xs text-ink-500">False Positive Rate</p>
+        <p class="text-lg font-bold" [ngClass]="m.falsePositiveRate > 0.15 ? 'text-red-600' : 'text-ink-900'">{{ pct(m.falsePositiveRate) }}</p>
+      </div>
+      <div class="rounded-lg bg-ink-50 p-3">
+        <p class="text-xs text-ink-500">Population Stability</p>
+        <p class="text-lg font-bold" [ngClass]="m.populationStability > 0.08 ? 'text-amber-600' : 'text-ink-900'">{{ m.populationStability }}</p>
+      </div>
+    </div>
+
+    <button class="text-sm text-ink-500 hover:text-ink-700 flex items-center gap-1 mt-4" (click)="toggleExpand(m.id)">
+      <app-icon [name]="isExpanded(m.id) ? 'chevron-up' : 'chevron-down'" [size]="14"></app-icon>
+      {{ isExpanded(m.id) ? 'Hide' : 'Show' }} feature importance &amp; incidents ({{ m.incidents.length }})
+    </button>
+
+    <div class="mt-4 pt-4 border-t border-ink-100 grid sm:grid-cols-2 gap-6 fade-in" *ngIf="isExpanded(m.id)">
+      <div>
+        <p class="text-xs font-semibold uppercase tracking-wide text-ink-400 mb-3">Feature Importance</p>
+        <div class="space-y-2.5">
+          <div *ngFor="let f of m.featureImportance">
+            <div class="flex items-center justify-between text-xs mb-1">
+              <span class="text-ink-600">{{ f.feature }}</span>
+              <span class="font-medium text-ink-800">{{ pct(f.importance) }}</span>
+            </div>
+            <div class="w-full h-1.5 bg-ink-100 rounded-full overflow-hidden">
+              <div class="h-full bg-brand-600 rounded-full" [style.width.%]="f.importance * 100"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div>
+        <p class="text-xs font-semibold uppercase tracking-wide text-ink-400 mb-3">Production Incidents</p>
+        <div class="space-y-2" *ngIf="m.incidents.length">
+          <div class="flex items-start gap-2 text-sm" *ngFor="let inc of m.incidents">
+            <span [ngClass]="incidentBadge(inc.severity)" class="shrink-0">{{ inc.severity }}</span>
+            <div>
+              <p class="text-ink-700">{{ inc.description }}</p>
+              <p class="text-xs text-ink-400">{{ inc.date }}</p>
+            </div>
+          </div>
+        </div>
+        <p class="text-sm text-ink-400" *ngIf="!m.incidents.length">No incidents recorded.</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div *ngIf="loading" class="flex items-center justify-center py-24 text-ink-400">Loading model registry...</div>

@@ -1,0 +1,104 @@
+<app-page-header title="Device & Digital Intelligence" subtitle="Device, IP and session fingerprinting to surface shared-device fraud and mule-account networks.">
+</app-page-header>
+
+<div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6" *ngIf="!loading">
+  <div class="card p-5"><p class="muted mb-1">Devices Tracked</p><p class="text-2xl font-bold text-ink-900">{{ devices.length }}</p></div>
+  <div class="card p-5"><p class="muted mb-1">Shared Across Customers</p><p class="text-2xl font-bold text-red-500">{{ sharedDevices().length }}</p></div>
+  <div class="card p-5"><p class="muted mb-1">High Risk</p><p class="text-2xl font-bold text-red-500">{{ highRiskCount() }}</p></div>
+  <div class="card p-5"><p class="muted mb-1">New (7 days)</p><p class="text-2xl font-bold text-amber-600">1</p></div>
+</div>
+
+<div class="relative max-w-sm mb-5" *ngIf="!loading">
+  <app-icon name="search" [size]="16" class="absolute left-3 top-1/2 -translate-y-1/2 text-ink-400"></app-icon>
+  <input class="input pl-9" placeholder="Search by device ID or linked customer..." [(ngModel)]="query"/>
+</div>
+
+<div class="grid lg:grid-cols-5 gap-5" *ngIf="!loading">
+  <div class="lg:col-span-3 space-y-6">
+    <div class="card overflow-x-auto">
+      <table class="table">
+        <thead><tr><th>Device</th><th>Type</th><th>IP / Location</th><th>Linked Customers</th><th>Risk</th><th>Last Seen</th></tr></thead>
+        <tbody>
+          <tr *ngFor="let d of filtered()" class="cursor-pointer" [class.bg-brand-50]="selected()?.id === d.id" (click)="select(d)">
+            <td class="font-mono text-xs text-ink-700">{{ d.deviceId }}</td>
+            <td class="text-sm text-ink-600">{{ d.deviceType }} &middot; {{ d.os }}</td>
+            <td class="text-sm text-ink-600">{{ d.ipAddress }}<br/><span class="text-xs text-ink-400">{{ d.location }}</span></td>
+            <td class="text-sm">
+              <span [ngClass]="d.linkedCustomers.length > 1 ? 'text-red-600 font-semibold' : 'text-ink-700'">{{ d.linkedCustomers.join(', ') }}</span>
+            </td>
+            <td><span [ngClass]="riskBadge(d.riskLevel)">{{ d.riskLevel }}</span></td>
+            <td class="text-sm text-ink-500 whitespace-nowrap">{{ d.lastSeen }}</td>
+          </tr>
+        </tbody>
+      </table>
+      <div *ngIf="!filtered().length" class="py-10 text-center text-sm text-ink-400">No devices match your search.</div>
+    </div>
+
+    <div class="space-y-3">
+      <h3 class="section-title">Flagged Devices</h3>
+      <div class="card p-4 flex items-start gap-3" *ngFor="let d of devices" [hidden]="!d.flags.length">
+        <app-icon name="alert-triangle" [size]="16" class="text-amber-500 shrink-0 mt-0.5"></app-icon>
+        <div>
+          <p class="text-sm font-medium text-ink-900">{{ d.deviceId }} <span class="text-ink-400 font-normal">— {{ d.linkedCustomers.join(', ') }}</span></p>
+          <ul class="text-sm text-ink-600 mt-1">
+            <li *ngFor="let f of d.flags">&bull; {{ f }}</li>
+          </ul>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="lg:col-span-2">
+    <div class="card p-5 sticky top-6" *ngIf="selected() as d">
+      <div class="flex items-start justify-between mb-4">
+        <div>
+          <h3 class="font-mono text-sm font-semibold text-ink-900">{{ d.deviceId }}</h3>
+          <p class="text-xs text-ink-400">{{ d.deviceType }} &middot; {{ d.os }}</p>
+        </div>
+        <span [ngClass]="riskBadge(d.riskLevel)">{{ d.riskLevel }} risk</span>
+      </div>
+
+      <div class="grid grid-cols-2 gap-3 text-sm mb-4">
+        <div><p class="text-ink-400 text-xs">IP Address</p><p class="font-mono text-xs text-ink-800">{{ d.ipAddress }}</p></div>
+        <div><p class="text-ink-400 text-xs">Location</p><p class="font-medium text-ink-800">{{ d.location }}</p></div>
+        <div><p class="text-ink-400 text-xs">First Seen</p><p class="font-medium text-ink-800">{{ d.firstSeen }}</p></div>
+        <div><p class="text-ink-400 text-xs">Last Seen</p><p class="font-medium text-ink-800">{{ d.lastSeen }}</p></div>
+      </div>
+
+      <div class="rounded-lg bg-ink-50 p-4 mb-4">
+        <p class="text-xs font-semibold uppercase tracking-wide text-ink-400 mb-2">Linked Customers</p>
+        <div class="space-y-1.5">
+          <ng-container *ngFor="let name of d.linkedCustomers">
+            <a *ngIf="customerId(name) as cid" [routerLink]="['/app/my-clients', cid]" class="flex items-center justify-between text-sm text-ink-800 hover:text-brand-600 py-0.5">
+              {{ name }} <app-icon name="arrow-right" [size]="13"></app-icon>
+            </a>
+            <p *ngIf="!customerId(name)" class="text-sm text-ink-600 py-0.5">{{ name }}</p>
+          </ng-container>
+        </div>
+      </div>
+
+      <div class="rounded-lg bg-amber-50 p-4 mb-4" *ngIf="d.flags.length">
+        <p class="text-xs font-semibold uppercase tracking-wide text-amber-600 mb-2">Risk Signals</p>
+        <ul class="space-y-1 text-sm text-amber-800">
+          <li *ngFor="let f of d.flags">&bull; {{ f }}</li>
+        </ul>
+      </div>
+
+      <div *ngIf="otherLinkedDevices(d).length">
+        <p class="text-xs font-semibold uppercase tracking-wide text-ink-400 mb-2">Related Devices (shared customer)</p>
+        <div class="space-y-2">
+          <button *ngFor="let other of otherLinkedDevices(d)" class="w-full text-left rounded-lg border border-ink-100 p-2.5 hover:bg-ink-50" (click)="select(other)">
+            <p class="font-mono text-xs text-ink-800">{{ other.deviceId }}</p>
+            <p class="text-xs text-ink-500">{{ other.linkedCustomers.join(', ') }}</p>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <div class="card" *ngIf="!selected()">
+      <app-empty-state icon="smartphone" title="Select a device" subtitle="Click a row on the left to see linked customers, risk signals and related devices."></app-empty-state>
+    </div>
+  </div>
+</div>
+
+<div *ngIf="loading" class="flex items-center justify-center py-24 text-ink-400">Loading device intelligence...</div>

@@ -1,0 +1,39 @@
+<app-page-header title="CTR / ITR Regulatory Reporting" subtitle="Automated identification of qualifying cash transactions (CTR) and international transfers (ITR).">
+</app-page-header>
+
+<div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+  <div class="card p-5"><p class="muted mb-1">Pending Validation</p><p class="text-2xl font-bold text-ink-900">{{ countByStatus('pending_validation') }}</p></div>
+  <div class="card p-5"><p class="muted mb-1">Exceptions</p><p class="text-2xl font-bold text-red-500">{{ countByStatus('exception') }}</p></div>
+  <div class="card p-5"><p class="muted mb-1">Ready to Submit</p><p class="text-2xl font-bold text-brand-600">{{ countByStatus('ready') }}</p></div>
+  <div class="card p-5"><p class="muted mb-1">Submitted / Confirmed</p><p class="text-2xl font-bold text-blue-600">{{ countByStatus('submitted') + countByStatus('confirmed') }}</p></div>
+</div>
+
+<div class="flex items-center gap-1 bg-ink-100 rounded-lg p-1 w-fit mb-5">
+  <button class="px-3 py-1.5 rounded-md text-sm font-medium" [class.bg-white]="typeFilter === 'all'" [class.shadow-sm]="typeFilter === 'all'" (click)="typeFilter = 'all'">All</button>
+  <button class="px-3 py-1.5 rounded-md text-sm font-medium" [class.bg-white]="typeFilter === 'CTR'" [class.shadow-sm]="typeFilter === 'CTR'" (click)="typeFilter = 'CTR'">CTR</button>
+  <button class="px-3 py-1.5 rounded-md text-sm font-medium" [class.bg-white]="typeFilter === 'ITR'" [class.shadow-sm]="typeFilter === 'ITR'" (click)="typeFilter = 'ITR'">ITR</button>
+</div>
+
+<div class="card overflow-x-auto" *ngIf="!loading">
+  <table class="table">
+    <thead><tr><th>Transaction</th><th>Customer</th><th>Type</th><th>Amount</th><th>Threshold Triggered</th><th>Status</th><th>Created</th></tr></thead>
+    <tbody>
+      <tr *ngFor="let r of filtered()">
+        <td class="font-mono text-xs text-ink-500">{{ r.transactionRef }}</td>
+        <td class="font-medium text-ink-900">{{ r.customerName }}</td>
+        <td><span class="badge-blue">{{ r.reportType }}</span></td>
+        <td class="font-medium text-ink-800">{{ formatAmount(r) }}</td>
+        <td class="text-sm text-ink-600">{{ r.thresholdTriggered }}</td>
+        <td><span [ngClass]="statusBadge(r.status)">{{ r.status.replace('_',' ') }}</span></td>
+        <td class="text-sm text-ink-500">{{ r.createdAt }}</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<div *ngIf="loading" class="flex items-center justify-center py-24 text-ink-400">Loading reports...</div>
+
+<div class="card p-5 mt-6 flex items-start gap-3">
+  <app-icon name="info" [size]="18" class="text-brand-600 shrink-0 mt-0.5"></app-icon>
+  <p class="text-sm text-ink-600">Thresholds and formats are configuration-driven — Nigeria's CBN/NFIU thresholds ship as the default regulatory pack and can be adjusted as requirements change.</p>
+</div>

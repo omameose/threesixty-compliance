@@ -1,0 +1,40 @@
+<app-page-header title="Case Management" subtitle="The compliance operating system spine — Alert → Investigate → Review Evidence → Decision → STR/SAR or Close.">
+</app-page-header>
+
+<div class="flex items-center gap-1 bg-ink-100 rounded-lg p-1 w-fit mb-5 overflow-x-auto">
+  <button class="px-3 py-1.5 rounded-md text-sm font-medium whitespace-nowrap" [class.bg-white]="statusFilter === 'all'" [class.shadow-sm]="statusFilter === 'all'" (click)="statusFilter = 'all'">All</button>
+  <button class="px-3 py-1.5 rounded-md text-sm font-medium whitespace-nowrap" [class.bg-white]="statusFilter === 'open'" [class.shadow-sm]="statusFilter === 'open'" (click)="statusFilter = 'open'">Open</button>
+  <button class="px-3 py-1.5 rounded-md text-sm font-medium whitespace-nowrap" [class.bg-white]="statusFilter === 'investigating'" [class.shadow-sm]="statusFilter === 'investigating'" (click)="statusFilter = 'investigating'">Investigating</button>
+  <button class="px-3 py-1.5 rounded-md text-sm font-medium whitespace-nowrap" [class.bg-white]="statusFilter === 'pending_info'" [class.shadow-sm]="statusFilter === 'pending_info'" (click)="statusFilter = 'pending_info'">Pending Info</button>
+  <button class="px-3 py-1.5 rounded-md text-sm font-medium whitespace-nowrap" [class.bg-white]="statusFilter === 'escalated'" [class.shadow-sm]="statusFilter === 'escalated'" (click)="statusFilter = 'escalated'">Escalated</button>
+  <button class="px-3 py-1.5 rounded-md text-sm font-medium whitespace-nowrap" [class.bg-white]="statusFilter === 'closed'" [class.shadow-sm]="statusFilter === 'closed'" (click)="statusFilter = 'closed'">Closed</button>
+</div>
+
+<div class="card overflow-x-auto" *ngIf="!loading && filtered().length">
+  <table class="table">
+    <thead><tr><th>Case</th><th>Customer</th><th>Type</th><th>Priority</th><th>Status</th><th>Assigned To</th><th>Opened</th><th></th></tr></thead>
+    <tbody>
+      <tr *ngFor="let c of filtered()">
+        <td class="font-mono text-xs text-ink-500">{{ c.caseNumber }}</td>
+        <td>
+          <div class="flex items-center gap-3">
+            <app-avatar [name]="c.customerName" [size]="30"></app-avatar>
+            <span class="font-medium text-ink-900">{{ c.customerName }}</span>
+          </div>
+        </td>
+        <td><span class="badge-blue">{{ c.type }}</span></td>
+        <td><span [ngClass]="priorityBadge(c.priority)">{{ c.priority }}</span></td>
+        <td><span [ngClass]="statusBadge(c.status)">{{ c.status.replace('_',' ') }}</span></td>
+        <td class="text-sm text-ink-600">{{ c.assignedTo }}</td>
+        <td class="text-sm text-ink-500">{{ c.openedAt }}</td>
+        <td><a [routerLink]="['/app/cases', c.id]" class="btn-secondary btn-sm">Open</a></td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<div class="card" *ngIf="!loading && !filtered().length">
+  <app-empty-state icon="folder" title="No cases in this view" subtitle="Cases opened from alerts or manually will appear here."></app-empty-state>
+</div>
+
+<div *ngIf="loading" class="flex items-center justify-center py-24 text-ink-400">Loading cases...</div>

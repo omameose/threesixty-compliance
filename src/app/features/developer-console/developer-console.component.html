@@ -1,0 +1,124 @@
+<app-page-header title="Developer Console" subtitle="Manage API keys, webhooks and integration settings."></app-page-header>
+
+<div class="flex items-center bg-ink-100 rounded-lg p-1 w-fit mb-6">
+  <button class="px-4 py-2 rounded-md text-sm font-medium" [class.bg-white]="activeTab === 'keys'" [class.shadow-sm]="activeTab === 'keys'" (click)="activeTab = 'keys'">API Keys</button>
+  <button class="px-4 py-2 rounded-md text-sm font-medium" [class.bg-white]="activeTab === 'webhooks'" [class.shadow-sm]="activeTab === 'webhooks'" (click)="activeTab = 'webhooks'">Webhooks</button>
+  <button class="px-4 py-2 rounded-md text-sm font-medium" [class.bg-white]="activeTab === 'logs'" [class.shadow-sm]="activeTab === 'logs'" (click)="activeTab = 'logs'">Webhook Logs</button>
+</div>
+
+<!-- API KEYS -->
+<div *ngIf="activeTab === 'keys'" class="space-y-5 max-w-3xl">
+  <div class="card p-6" *ngFor="let key of apiKeys">
+    <div class="flex items-center justify-between mb-4">
+      <div class="flex items-center gap-2">
+        <span [ngClass]="key.environment === 'live' ? 'badge-green' : 'badge-gray'">{{ key.environment === 'live' ? 'Live Mode' : 'Test Mode' }}</span>
+        <span class="text-xs text-ink-400">Created {{ key.createdAt }} &middot; Last used {{ key.lastUsed }}</span>
+      </div>
+      <button class="btn-secondary btn-sm" (click)="openRegen(key.environment)"><app-icon name="refresh" [size]="13"></app-icon> Regenerate</button>
+    </div>
+    <div class="space-y-3">
+      <div>
+        <label class="label">Public Key</label>
+        <div class="flex gap-2">
+          <input class="input font-mono text-xs" [value]="key.publicKey" readonly/>
+          <button class="btn-secondary shrink-0" (click)="copy(key.publicKey, key.id + '-pub')">
+            <app-icon [name]="copiedKey() === key.id + '-pub' ? 'check' : 'copy'" [size]="16"></app-icon>
+          </button>
+        </div>
+      </div>
+      <div>
+        <label class="label">Secret Key</label>
+        <div class="flex gap-2">
+          <input class="input font-mono text-xs" [value]="key.secretKeyMasked" readonly/>
+          <button class="btn-secondary shrink-0" (click)="copy(key.secretKeyMasked, key.id + '-sec')">
+            <app-icon [name]="copiedKey() === key.id + '-sec' ? 'check' : 'copy'" [size]="16"></app-icon>
+          </button>
+        </div>
+        <p class="text-xs text-ink-400 mt-1.5 flex items-center gap-1"><app-icon name="lock" [size]="12"></app-icon> Never share your secret key or expose it client-side.</p>
+      </div>
+    </div>
+  </div>
+
+  <div class="card p-6 bg-ink-950 text-ink-100">
+    <h3 class="font-semibold text-white mb-2 flex items-center gap-2"><app-icon name="code" [size]="17"></app-icon> Quick Start</h3>
+    <pre class="text-xs bg-black/30 rounded-lg p-4 overflow-x-auto"><code>curl -X POST https://api.360compliance.io/v1/compliance-links \
+  -H "Authorization: Bearer &lt;YOUR_SECRET_KEY&gt;" \
+  -H "Content-Type: application/json" \
+  -d '{{ '{' }}
+    "form_id": "form-001",
+    "customer": {{ '{' }} "full_name": "Jane Doe", "email": "jane&#64;example.com" {{ '}' }}
+  {{ '}' }}'</code></pre>
+  </div>
+</div>
+
+<!-- WEBHOOKS -->
+<div *ngIf="activeTab === 'webhooks' && webhookConfig" class="max-w-3xl space-y-5">
+  <div class="card p-6">
+    <div class="flex items-center justify-between mb-4">
+      <h3 class="font-semibold text-ink-900">Webhook Endpoint</h3>
+      <label class="flex items-center gap-2 text-sm text-ink-600">
+        <input type="checkbox" [(ngModel)]="webhookConfig.enabled" class="rounded border-ink-300 text-brand-600"/> Enabled
+      </label>
+    </div>
+    <label class="label">Endpoint URL</label>
+    <input class="input mb-4" [(ngModel)]="webhookConfig.url" placeholder="https://your-app.com/webhooks/360compliance"/>
+
+    <label class="label">Signing Secret</label>
+    <div class="flex gap-2 mb-4">
+      <input class="input font-mono text-xs" [type]="visibleSecrets.has('sign') ? 'text' : 'password'" [value]="webhookConfig.signingSecret" readonly/>
+      <button class="btn-secondary shrink-0" (click)="toggleSecretVisible('sign')"><app-icon [name]="visibleSecrets.has('sign') ? 'eye' : 'eye'" [size]="16"></app-icon></button>
+      <button class="btn-secondary shrink-0" (click)="copy(webhookConfig.signingSecret, 'sign')"><app-icon [name]="copiedKey() === 'sign' ? 'check' : 'copy'" [size]="16"></app-icon></button>
+    </div>
+
+    <label class="label">Encryption Key</label>
+    <div class="flex gap-2 mb-2">
+      <input class="input font-mono text-xs" [type]="visibleSecrets.has('enc') ? 'text' : 'password'" [value]="webhookConfig.encryptionKey" readonly/>
+      <button class="btn-secondary shrink-0" (click)="toggleSecretVisible('enc')"><app-icon [name]="visibleSecrets.has('enc') ? 'eye' : 'eye'" [size]="16"></app-icon></button>
+      <button class="btn-secondary shrink-0" (click)="copy(webhookConfig.encryptionKey, 'enc')"><app-icon [name]="copiedKey() === 'enc' ? 'check' : 'copy'" [size]="16"></app-icon></button>
+    </div>
+    <p class="text-xs text-ink-400">Use this key to verify the <span class="font-mono">X-360Compliance-Signature</span> header and decrypt sensitive payload fields.</p>
+  </div>
+
+  <div class="card p-6">
+    <h3 class="font-semibold text-ink-900 mb-4">Subscribed Events</h3>
+    <div class="grid sm:grid-cols-2 gap-2">
+      <label class="flex items-center gap-2 text-sm text-ink-700 p-2.5 rounded-lg hover:bg-ink-50 cursor-pointer" *ngFor="let ev of availableEvents">
+        <input type="checkbox" [checked]="webhookConfig.events.includes(ev)" (change)="toggleEvent(ev)" class="rounded border-ink-300 text-brand-600"/>
+        <span class="font-mono text-xs">{{ ev }}</span>
+      </label>
+    </div>
+  </div>
+
+  <div class="flex justify-end gap-3">
+    <span *ngIf="saved()" class="text-sm text-brand-600 self-center">Saved!</span>
+    <button class="btn-primary" (click)="saveWebhook()">Save Webhook Settings</button>
+  </div>
+</div>
+
+<!-- LOGS -->
+<div *ngIf="activeTab === 'logs'" class="card overflow-x-auto">
+  <table class="table">
+    <thead><tr><th>Event</th><th>URL</th><th>Status</th><th>Code</th><th>Timestamp</th></tr></thead>
+    <tbody>
+      <tr *ngFor="let log of webhookLogs">
+        <td class="font-mono text-xs text-ink-800">{{ log.event }}</td>
+        <td class="text-xs text-ink-500 max-w-xs truncate">{{ log.url }}</td>
+        <td>
+          <span *ngIf="log.status === 'success'" class="badge-green">Success</span>
+          <span *ngIf="log.status === 'failed'" class="badge-red">Failed</span>
+          <span *ngIf="log.status === 'pending'" class="badge-yellow">Pending</span>
+        </td>
+        <td class="text-sm text-ink-600">{{ log.statusCode || '—' }}</td>
+        <td class="text-sm text-ink-500">{{ log.timestamp }}</td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<app-modal [open]="regenModalOpen()" title="Regenerate API Key?" subtitle="Your existing key will stop working immediately. This cannot be undone." (close)="regenModalOpen.set(false)">
+  <p class="text-sm text-ink-600">Are you sure you want to regenerate your <strong>{{ regenTargetEnv }}</strong> secret key? Update all integrations using this key.</p>
+  <div modal-footer class="flex gap-3 w-full sm:w-auto">
+    <button class="btn-secondary flex-1" (click)="regenModalOpen.set(false)">Cancel</button>
+    <button class="btn-danger flex-1" (click)="confirmRegen()">Regenerate Key</button>
+  </div>
+</app-modal>

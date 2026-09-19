@@ -1,0 +1,109 @@
+<app-page-header title="PEP Screening" subtitle="Identify politically exposed persons, their family members and close associates.">
+  <button class="btn-primary" (click)="runModalOpen.set(true); newSubjectName=''"><app-icon name="user-check" [size]="16"></app-icon> Run New Screening</button>
+</app-page-header>
+
+<div class="fixed bottom-6 right-6 z-40 bg-ink-900 text-white text-sm px-4 py-3 rounded-lg shadow-lg fade-in" *ngIf="toast()">{{ toast() }}</div>
+
+<div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+  <div class="card p-5"><p class="muted mb-1">Total Screened</p><p class="text-2xl font-bold text-ink-900">{{ cases.length }}</p></div>
+  <div class="card p-5"><p class="muted mb-1">PEP Matches</p><p class="text-2xl font-bold text-red-500">{{ countByVerdict('PEP_MATCH') }}</p></div>
+  <div class="card p-5"><p class="muted mb-1">Potential PEPs</p><p class="text-2xl font-bold text-amber-600">{{ countByVerdict('POTENTIAL_PEP') }}</p></div>
+  <div class="card p-5"><p class="muted mb-1">Clear</p><p class="text-2xl font-bold text-brand-600">{{ countByVerdict('CLEAR') }}</p></div>
+</div>
+
+<div class="grid lg:grid-cols-5 gap-5" *ngIf="!loading">
+  <div class="lg:col-span-3 space-y-4">
+    <div class="flex flex-col sm:flex-row gap-3">
+      <div class="relative flex-1">
+        <app-icon name="search" [size]="16" class="absolute left-3 top-1/2 -translate-y-1/2 text-ink-400"></app-icon>
+        <input class="input pl-9" placeholder="Search by subject name..." [(ngModel)]="query"/>
+      </div>
+      <select class="input !w-auto" [(ngModel)]="verdictFilter">
+        <option value="all">All verdicts</option>
+        <option value="PEP_MATCH">PEP Match</option>
+        <option value="POTENTIAL_PEP">Potential PEP</option>
+        <option value="CLEAR">Clear</option>
+      </select>
+    </div>
+
+    <div class="card overflow-x-auto">
+      <table class="table">
+        <thead><tr><th>Subject</th><th>Category</th><th>Relationship</th><th>Verdict</th><th>Review</th><th>Screened</th></tr></thead>
+        <tbody>
+          <tr *ngFor="let c of filtered()" class="cursor-pointer" [class.bg-brand-50]="selected()?.id === c.id" (click)="select(c)">
+            <td class="font-medium text-ink-900">{{ c.subjectName }}</td>
+            <td class="text-sm text-ink-600">{{ c.category || '—' }}</td>
+            <td class="text-sm text-ink-600">{{ c.relationship || '—' }}</td>
+            <td><span [ngClass]="verdictBadge(c.verdict)">{{ c.verdict.replace('_',' ') }}</span></td>
+            <td><span [ngClass]="reviewBadge(c.reviewStatus)">{{ c.reviewStatus.replace('_',' ') }}</span></td>
+            <td class="text-sm text-ink-500 whitespace-nowrap">{{ c.screenedAt }}</td>
+          </tr>
+        </tbody>
+      </table>
+      <div *ngIf="!filtered().length" class="py-10 text-center text-sm text-ink-400">No cases match your filters.</div>
+    </div>
+  </div>
+
+  <div class="lg:col-span-2">
+    <div class="card p-5 sticky top-6" *ngIf="selected() as c">
+      <div class="flex items-start justify-between mb-4">
+        <div>
+          <h3 class="font-semibold text-ink-900 text-lg">{{ c.subjectName }}</h3>
+          <p class="text-xs text-ink-400">{{ c.country || 'Country unknown' }}</p>
+        </div>
+        <span [ngClass]="verdictBadge(c.verdict)">{{ c.verdict.replace('_',' ') }}</span>
+      </div>
+
+      <div class="grid grid-cols-2 gap-3 text-sm mb-4">
+        <div><p class="text-ink-400 text-xs">Confidence Score</p><p class="font-semibold text-ink-900">{{ c.confidenceScore }}%</p></div>
+        <div *ngIf="c.position"><p class="text-ink-400 text-xs">Position</p><p class="font-medium text-ink-800">{{ c.position }}</p></div>
+        <div *ngIf="c.relationship"><p class="text-ink-400 text-xs">Relationship</p><p class="font-medium text-ink-800">{{ c.relationship }}</p></div>
+        <div *ngIf="c.relatedPepName"><p class="text-ink-400 text-xs">Related PEP</p><p class="font-medium text-ink-800">{{ c.relatedPepName }}</p></div>
+        <div><p class="text-ink-400 text-xs">Source</p><p class="font-medium text-ink-800">{{ c.source }}</p></div>
+        <div><p class="text-ink-400 text-xs">Data Version</p><p class="font-mono text-xs text-ink-700">{{ c.dataSourceVersion }}</p></div>
+      </div>
+
+      <div class="rounded-lg bg-brand-50 p-3 mb-4 flex items-center gap-2" *ngIf="c.eddRequested">
+        <app-icon name="check-circle" [size]="15" class="text-brand-600"></app-icon>
+        <p class="text-sm text-brand-800 font-medium">Enhanced Due Diligence has been requested for this subject.</p>
+      </div>
+
+      <div class="flex items-center justify-between text-xs text-ink-400 mb-4" *ngIf="c.reviewedBy">
+        <span>Last reviewed by <strong class="text-ink-600">{{ c.reviewedBy }}</strong></span>
+        <span>{{ c.reviewedAt }}</span>
+      </div>
+
+      <div class="grid grid-cols-2 gap-2 mb-2" *ngIf="c.verdict !== 'CLEAR'">
+        <button class="btn-danger btn-sm justify-center" [disabled]="c.reviewStatus === 'confirmed_match'" (click)="review('confirmed_match')">Confirm PEP</button>
+        <button class="btn-secondary btn-sm justify-center" [disabled]="c.reviewStatus === 'false_positive'" (click)="review('false_positive')">Dismiss</button>
+      </div>
+      <div class="grid grid-cols-2 gap-2 mb-5" *ngIf="c.verdict !== 'CLEAR'">
+        <button class="btn-secondary btn-sm justify-center" [disabled]="c.eddRequested" (click)="requestEdd()">Request EDD</button>
+        <button class="btn-primary btn-sm justify-center" [disabled]="c.reviewStatus === 'escalated'" (click)="review('escalated')">Escalate</button>
+      </div>
+
+      <app-notes-panel [notes]="c.notes" (addNote)="addNote($event)"></app-notes-panel>
+    </div>
+
+    <div class="card" *ngIf="!selected()">
+      <app-empty-state icon="user-check" title="Select a case" subtitle="Click a row on the left to review PEP details and record a decision."></app-empty-state>
+    </div>
+  </div>
+</div>
+
+<div *ngIf="loading" class="flex items-center justify-center py-24 text-ink-400">Loading PEP screening queue...</div>
+
+<app-modal [open]="runModalOpen()" title="Run New PEP Screening" (close)="runModalOpen.set(false)">
+  <div class="space-y-4" *ngIf="!running()">
+    <div>
+      <label class="label">Full Name</label>
+      <input class="input" [(ngModel)]="newSubjectName" placeholder="e.g. Grace Effiong"/>
+    </div>
+    <p class="text-xs text-ink-400">We compare this identity against known politically exposed persons, their family members and close associates using exact and fuzzy matching.</p>
+  </div>
+  <div *ngIf="running()" class="text-center py-10 text-ink-500 text-sm">Screening against the PEP database...</div>
+  <div modal-footer class="flex gap-3 w-full sm:w-auto" *ngIf="!running()">
+    <button class="btn-secondary flex-1" (click)="runModalOpen.set(false)">Cancel</button>
+    <button class="btn-primary flex-1" [disabled]="!newSubjectName.trim()" (click)="runScreening()">Run Screening</button>
+  </div>
+</app-modal>

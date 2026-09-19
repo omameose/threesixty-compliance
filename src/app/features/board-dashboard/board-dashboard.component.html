@@ -1,0 +1,45 @@
+<app-page-header title="Management / Board Compliance Dashboard" subtitle="How exposed are we? How effective are we? Where are our risks?">
+</app-page-header>
+
+<ng-container *ngIf="!loading">
+  <h3 class="section-title mb-3">How exposed are we?</h3>
+  <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+    <app-stat-card label="High-Risk Customers" [value]="highRiskCustomers().length" [delta]="0" icon="alert-triangle"></app-stat-card>
+    <app-stat-card label="PEPs on File" [value]="pepCount()" [delta]="0" icon="user-check"></app-stat-card>
+    <app-stat-card label="Sanctions Matches" [value]="sanctionsCount()" [delta]="0" icon="shield"></app-stat-card>
+    <app-stat-card label="Open Alerts" [value]="openAlerts().length" [delta]="0" icon="bell"></app-stat-card>
+  </div>
+
+  <h3 class="section-title mb-3">How effective are we?</h3>
+  <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+    <app-stat-card label="Open Investigations" [value]="openInvestigations().length" [delta]="0" icon="folder"></app-stat-card>
+    <app-stat-card label="STRs Filed (period)" [value]="strsFiled()" [delta]="0" icon="flag"></app-stat-card>
+    <app-stat-card label="Alert Closure Rate" [value]="falsePositiveRate() + '%'" [delta]="0" icon="check-circle"></app-stat-card>
+    <app-stat-card label="Case → STR Conversion" [value]="strConversionRate() + '%'" [delta]="0" icon="activity"></app-stat-card>
+  </div>
+
+  <h3 class="section-title mb-3">Where are our risks?</h3>
+  <div class="card overflow-x-auto">
+    <div class="p-5 border-b border-ink-100"><h3 class="font-semibold text-ink-900">Exposure by Geography</h3></div>
+    <table class="table">
+      <thead><tr><th>Region</th><th>Customers</th><th>High-Risk Customers</th><th>Concentration</th></tr></thead>
+      <tbody>
+        <tr *ngFor="let g of geographyExposure">
+          <td class="font-medium text-ink-900">{{ g.region }}</td>
+          <td class="text-sm text-ink-600">{{ g.customers }}</td>
+          <td class="text-sm" [ngClass]="g.highRisk > 10 ? 'text-red-600 font-semibold' : 'text-ink-600'">{{ g.highRisk }}</td>
+          <td>
+            <div class="flex items-center gap-2 w-32">
+              <div class="flex-1 h-1.5 bg-ink-100 rounded-full overflow-hidden">
+                <div class="h-full bg-brand-600 rounded-full" [style.width.%]="(g.highRisk / g.customers) * 100 * 4"></div>
+              </div>
+              <span class="text-xs text-ink-500">{{ ((g.highRisk / g.customers) * 100) | number:'1.0-1' }}%</span>
+            </div>
+          </td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</ng-container>
+
+<div *ngIf="loading" class="flex items-center justify-center py-24 text-ink-400">Loading board dashboard...</div>

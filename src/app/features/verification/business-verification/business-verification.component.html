@@ -1,0 +1,136 @@
+<app-page-header title="Business Verification" subtitle="Confirm legal name, registration status, directors, shareholders and ownership against trusted registries.">
+  <button class="btn-primary" (click)="runModalOpen.set(true); newBizName=''; newRefNumber=''; newVerificationType=''; newCountry=''"><app-icon name="briefcase" [size]="16"></app-icon> Verify a Business</button>
+</app-page-header>
+
+<div class="fixed bottom-6 right-6 z-40 bg-ink-900 text-white text-sm px-4 py-3 rounded-lg shadow-lg fade-in" *ngIf="toast()">{{ toast() }}</div>
+
+<div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+  <div class="card p-5"><p class="muted mb-1">Verified</p><p class="text-2xl font-bold text-brand-600">{{ countByOutcome('VERIFIED') }}</p></div>
+  <div class="card p-5"><p class="muted mb-1">Review Required</p><p class="text-2xl font-bold text-amber-600">{{ countByOutcome('REVIEW_REQUIRED') }}</p></div>
+  <div class="card p-5"><p class="muted mb-1">Failed</p><p class="text-2xl font-bold text-red-500">{{ countByOutcome('FAILED') }}</p></div>
+  <div class="card p-5"><p class="muted mb-1">Pending</p><p class="text-2xl font-bold text-ink-900">{{ countByOutcome('PENDING') }}</p></div>
+</div>
+
+<div class="grid lg:grid-cols-5 gap-5" *ngIf="!loading">
+  <div class="lg:col-span-3 space-y-4">
+    <div class="flex flex-col sm:flex-row gap-3">
+      <div class="relative flex-1">
+        <app-icon name="search" [size]="16" class="absolute left-3 top-1/2 -translate-y-1/2 text-ink-400"></app-icon>
+        <input class="input pl-9" placeholder="Search by business name..." [(ngModel)]="query"/>
+      </div>
+      <select class="input !w-auto" [(ngModel)]="outcomeFilter">
+        <option value="all">All outcomes</option>
+        <option value="VERIFIED">Verified</option>
+        <option value="REVIEW_REQUIRED">Review Required</option>
+        <option value="FAILED">Failed</option>
+        <option value="PENDING">Pending</option>
+      </select>
+    </div>
+
+    <div class="card overflow-x-auto">
+      <table class="table">
+        <thead><tr><th>Business Name</th><th>Verification Type</th><th>Country</th><th>Outcome</th><th>Confidence</th><th>Date</th></tr></thead>
+        <tbody>
+          <tr *ngFor="let r of filtered()" class="cursor-pointer" [class.bg-brand-50]="selected()?.id === r.id" (click)="select(r)">
+            <td class="font-medium text-ink-900">{{ r.businessName }}</td>
+            <td class="text-sm text-ink-600">{{ r.verificationType }}</td>
+            <td class="text-sm text-ink-600">{{ r.country }}</td>
+            <td><span [ngClass]="outcomeBadge(r.outcome)">{{ r.outcome.replace('_',' ') }}</span></td>
+            <td class="text-sm text-ink-600">{{ r.confidenceScore ? r.confidenceScore + '%' : '—' }}</td>
+            <td class="text-sm text-ink-500 whitespace-nowrap">{{ r.checkedAt }}</td>
+          </tr>
+        </tbody>
+      </table>
+      <div *ngIf="!filtered().length" class="py-10 text-center text-sm text-ink-400">No records match your filters.</div>
+    </div>
+  </div>
+
+  <div class="lg:col-span-2">
+    <div class="card p-5 sticky top-6" *ngIf="selected() as r">
+      <div class="flex items-start justify-between mb-4">
+        <div>
+          <h3 class="font-semibold text-ink-900 text-lg">{{ r.businessName }}</h3>
+          <p class="text-xs text-ink-400">{{ r.referenceNumber }} &middot; {{ r.country }}</p>
+        </div>
+        <span [ngClass]="outcomeBadge(r.outcome)">{{ r.outcome.replace('_',' ') }}</span>
+      </div>
+
+      <div class="grid grid-cols-2 gap-3 text-sm mb-4">
+        <div><p class="text-ink-400 text-xs">Confidence Score</p><p class="font-semibold text-ink-900">{{ r.confidenceScore }}%</p></div>
+        <div *ngIf="r.incorporationStatus"><p class="text-ink-400 text-xs">Incorporation Status</p><p class="font-medium" [ngClass]="r.incorporationStatus === 'Active' ? 'text-brand-700' : 'text-red-600'">{{ r.incorporationStatus }}</p></div>
+        <div class="col-span-2" *ngIf="r.registeredAddress"><p class="text-ink-400 text-xs">Registered Address</p><p class="font-medium text-ink-800">{{ r.registeredAddress }}</p></div>
+        <div class="col-span-2"><p class="text-ink-400 text-xs">Data Sources</p><p class="font-medium text-ink-800">{{ r.dataSources.join(', ') || '—' }}</p></div>
+      </div>
+
+      <div class="grid grid-cols-2 gap-4 mb-4" *ngIf="r.directors.length || r.shareholders.length">
+        <div *ngIf="r.directors.length">
+          <p class="text-xs font-semibold uppercase tracking-wide text-ink-400 mb-2">Directors</p>
+          <div class="space-y-1 text-sm">
+            <div *ngFor="let d of r.directors" class="text-ink-800">{{ d.name }} <span class="text-ink-400">— {{ d.role }}</span></div>
+          </div>
+        </div>
+        <div *ngIf="r.shareholders.length">
+          <p class="text-xs font-semibold uppercase tracking-wide text-ink-400 mb-2">Shareholders</p>
+          <div class="space-y-1 text-sm">
+            <div *ngFor="let s of r.shareholders" class="text-ink-800 flex justify-between"><span>{{ s.name }}</span><span class="font-medium">{{ s.ownershipPct }}%</span></div>
+          </div>
+        </div>
+      </div>
+
+      <div class="rounded-lg bg-red-50 p-4 mb-4" *ngIf="r.discrepancies.length">
+        <p class="text-xs font-semibold uppercase tracking-wide text-red-500 mb-2">Discrepancies Found</p>
+        <ul class="space-y-1 text-sm text-red-700">
+          <li *ngFor="let d of r.discrepancies">&bull; {{ d }}</li>
+        </ul>
+      </div>
+
+      <div class="grid grid-cols-3 gap-2 mb-5">
+        <button class="btn-primary btn-sm justify-center" [disabled]="r.outcome === 'VERIFIED'" (click)="setOutcome('VERIFIED')">Approve</button>
+        <button class="btn-secondary btn-sm justify-center" [disabled]="r.outcome === 'REVIEW_REQUIRED'" (click)="setOutcome('REVIEW_REQUIRED')">Request Info</button>
+        <button class="btn-danger btn-sm justify-center" [disabled]="r.outcome === 'FAILED'" (click)="setOutcome('FAILED')">Reject</button>
+      </div>
+
+      <app-notes-panel [notes]="r.notes" (addNote)="addNote($event)"></app-notes-panel>
+    </div>
+
+    <div class="card" *ngIf="!selected()">
+      <app-empty-state icon="briefcase" title="Select a record" subtitle="Click a row on the left to view directors, shareholders, discrepancies and notes."></app-empty-state>
+    </div>
+  </div>
+</div>
+
+<div *ngIf="loading" class="flex items-center justify-center py-24 text-ink-400">Loading business verification queue...</div>
+
+<app-modal [open]="runModalOpen()" title="Verify a Business" (close)="runModalOpen.set(false)">
+  <div class="space-y-4" *ngIf="!running()">
+    <div>
+      <label class="label">Registered Business Name</label>
+      <input class="input" [(ngModel)]="newBizName" placeholder="e.g. PayFlux Technologies Limited"/>
+    </div>
+    <div class="grid grid-cols-2 gap-4">
+      <div>
+        <label class="label">Verification Type</label>
+        <select class="input" [(ngModel)]="newVerificationType">
+          <option value="">Select type</option>
+          <option *ngFor="let t of verificationTypes" [value]="t">{{ t }}</option>
+        </select>
+      </div>
+      <div>
+        <label class="label">Country</label>
+        <select class="input" [(ngModel)]="newCountry">
+          <option value="">Select country</option>
+          <option *ngFor="let c of countries" [value]="c">{{ c }}</option>
+        </select>
+      </div>
+    </div>
+    <div>
+      <label class="label">Reference / Registration Number</label>
+      <input class="input" [(ngModel)]="newRefNumber" placeholder="e.g. RC-1487321"/>
+    </div>
+  </div>
+  <div *ngIf="running()" class="text-center py-10 text-ink-500 text-sm">Reconciling against corporate registries...</div>
+  <div modal-footer class="flex gap-3 w-full sm:w-auto" *ngIf="!running()">
+    <button class="btn-secondary flex-1" (click)="runModalOpen.set(false)">Cancel</button>
+    <button class="btn-primary flex-1" [disabled]="!newBizName.trim() || !newRefNumber.trim()" (click)="runVerification()">Verify</button>
+  </div>
+</app-modal>

@@ -1,0 +1,108 @@
+<app-page-header title="Enhanced Due Diligence (EDD)" subtitle="Automatic EDD triggers with a checklist workflow — activation is blocked until mandatory requirements are complete.">
+</app-page-header>
+
+<div class="fixed bottom-6 right-6 z-40 bg-ink-900 text-white text-sm px-4 py-3 rounded-lg shadow-lg fade-in" *ngIf="toast()">{{ toast() }}</div>
+
+<div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6" *ngIf="!loading">
+  <div class="card p-5"><p class="muted mb-1">Pending</p><p class="text-2xl font-bold text-ink-900">{{ countByStatus('pending') }}</p></div>
+  <div class="card p-5"><p class="muted mb-1">In Progress</p><p class="text-2xl font-bold text-blue-600">{{ countByStatus('in_progress') }}</p></div>
+  <div class="card p-5"><p class="muted mb-1">Blocked</p><p class="text-2xl font-bold text-red-500">{{ countByStatus('blocked') }}</p></div>
+  <div class="card p-5"><p class="muted mb-1">Completed</p><p class="text-2xl font-bold text-brand-600">{{ countByStatus('completed') }}</p></div>
+</div>
+
+<div class="grid lg:grid-cols-5 gap-5" *ngIf="!loading">
+  <div class="lg:col-span-3 space-y-4">
+    <div class="flex flex-col sm:flex-row gap-3">
+      <div class="relative flex-1">
+        <app-icon name="search" [size]="16" class="absolute left-3 top-1/2 -translate-y-1/2 text-ink-400"></app-icon>
+        <input class="input pl-9" placeholder="Search customers..." [(ngModel)]="query"/>
+      </div>
+      <select class="input !w-auto" [(ngModel)]="statusFilter">
+        <option value="all">All statuses</option>
+        <option value="pending">Pending</option>
+        <option value="in_progress">In Progress</option>
+        <option value="blocked">Blocked</option>
+        <option value="completed">Completed</option>
+      </select>
+    </div>
+
+    <div class="card overflow-x-auto">
+      <table class="table">
+        <thead><tr><th>Customer</th><th>Trigger Reasons</th><th>Checklist</th><th>Status</th></tr></thead>
+        <tbody>
+          <tr *ngFor="let c of filtered()" class="cursor-pointer" [class.bg-brand-50]="selected()?.id === c.id" (click)="select(c)">
+            <td>
+              <div class="flex items-center gap-3">
+                <app-avatar [name]="c.customerName" [size]="30"></app-avatar>
+                <span class="font-medium text-ink-900">{{ c.customerName }}</span>
+              </div>
+            </td>
+            <td class="text-sm text-ink-600 max-w-xs truncate">{{ c.triggerReasons.join(', ') }}</td>
+            <td>
+              <div class="flex items-center gap-2 w-24">
+                <div class="flex-1 h-1.5 bg-ink-100 rounded-full overflow-hidden">
+                  <div class="h-full bg-brand-600 rounded-full" [style.width.%]="checklistPct(c)"></div>
+                </div>
+                <span class="text-xs text-ink-500">{{ checklistPct(c) }}%</span>
+              </div>
+            </td>
+            <td><span [ngClass]="statusBadge(c.status)">{{ c.status.replace('_',' ') }}</span></td>
+          </tr>
+        </tbody>
+      </table>
+      <div *ngIf="!filtered().length" class="py-10 text-center text-sm text-ink-400">No EDD cases match your filters.</div>
+    </div>
+  </div>
+
+  <div class="lg:col-span-2">
+    <div class="card p-5 sticky top-6" *ngIf="selected() as c">
+      <div class="flex items-center gap-3 mb-4">
+        <app-avatar [name]="c.customerName" [size]="36"></app-avatar>
+        <div>
+          <h3 class="font-semibold text-ink-900">{{ c.customerName }}</h3>
+          <p class="text-xs text-ink-400">Opened {{ c.openedAt }}</p>
+        </div>
+        <span [ngClass]="statusBadge(c.status)" class="ml-auto">{{ c.status.replace('_',' ') }}</span>
+      </div>
+
+      <div class="rounded-lg bg-amber-50 p-4 mb-4">
+        <p class="text-xs font-semibold uppercase tracking-wide text-amber-600 mb-2">Trigger Reasons</p>
+        <ul class="space-y-1 text-sm text-amber-800">
+          <li class="flex gap-2" *ngFor="let r of c.triggerReasons"><app-icon name="alert-triangle" [size]="13" class="shrink-0 mt-0.5"></app-icon> {{ r }}</li>
+        </ul>
+      </div>
+
+      <p class="text-xs font-semibold uppercase tracking-wide text-ink-400 mb-2">EDD Checklist</p>
+      <div class="space-y-2 mb-4">
+        <button class="w-full flex items-center gap-2.5 text-left py-1.5" *ngFor="let item of c.checklist" (click)="toggleItem(c, item.item)">
+          <app-icon [name]="item.completed ? 'check-circle' : 'x-circle'" [size]="17" [class.text-brand-600]="item.completed" [class.text-ink-300]="!item.completed"></app-icon>
+          <span class="text-sm" [ngClass]="item.completed ? 'text-ink-700' : 'text-ink-500'">{{ item.item }}</span>
+        </button>
+      </div>
+
+      <div class="grid grid-cols-2 gap-3 text-sm mb-4" *ngIf="c.sourceOfFunds || c.sourceOfWealth">
+        <div *ngIf="c.sourceOfFunds"><p class="text-ink-400 text-xs">Source of Funds</p><p class="text-ink-800">{{ c.sourceOfFunds }}</p></div>
+        <div *ngIf="c.sourceOfWealth"><p class="text-ink-400 text-xs">Source of Wealth</p><p class="text-ink-800">{{ c.sourceOfWealth }}</p></div>
+      </div>
+
+      <div class="rounded-lg bg-red-50 p-3 mb-4 flex items-center gap-2" *ngIf="c.status === 'blocked'">
+        <app-icon name="lock" [size]="15" class="text-red-500"></app-icon>
+        <p class="text-sm text-red-700">Account activation is blocked until mandatory EDD is complete.</p>
+      </div>
+
+      <div class="grid grid-cols-3 gap-2 mb-5">
+        <button class="btn-secondary btn-sm justify-center" [disabled]="c.status === 'in_progress'" (click)="setStatus(c, 'in_progress')">In Progress</button>
+        <button class="btn-primary btn-sm justify-center" [disabled]="checklistPct(c) < 100 || c.status === 'completed'" (click)="setStatus(c, 'completed')">Approve</button>
+        <button class="btn-danger btn-sm justify-center" [disabled]="c.status === 'blocked'" (click)="setStatus(c, 'blocked')">Block</button>
+      </div>
+
+      <app-notes-panel [notes]="c.notes" (addNote)="addNote($event)"></app-notes-panel>
+    </div>
+
+    <div class="card" *ngIf="!selected()">
+      <app-empty-state icon="file-check" title="Select a case" subtitle="Click a row on the left to work through the EDD checklist and evidence."></app-empty-state>
+    </div>
+  </div>
+</div>
+
+<div *ngIf="loading" class="flex items-center justify-center py-24 text-ink-400">Loading EDD cases...</div>

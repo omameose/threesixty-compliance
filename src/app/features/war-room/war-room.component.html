@@ -1,0 +1,67 @@
+<div class="-m-4 sm:-m-6 min-h-[calc(100vh-4rem)] bg-ink-950 text-white p-4 sm:p-6" *ngIf="!loading">
+  <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
+    <div>
+      <h1 class="text-xl sm:text-2xl font-bold flex items-center gap-2">
+        <app-icon name="activity" [size]="22" class="text-brand-500"></app-icon> Executive War Room
+      </h1>
+      <p class="text-ink-400 text-sm mt-1">Live risk-exposure view for the CCO, MLRO, CRO and Board Risk Committee.</p>
+    </div>
+    <span class="badge-green inline-flex items-center gap-1.5 bg-brand-500/15 text-brand-400 w-fit">
+      <span class="w-2 h-2 rounded-full bg-brand-500 animate-pulse"></span> Live &middot; {{ now() | date:'shortTime' }}
+    </span>
+  </div>
+
+  <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+    <div class="rounded-2xl bg-white/5 border border-white/10 p-5">
+      <p class="text-ink-400 text-xs uppercase tracking-wide mb-2">Overall Risk Score</p>
+      <p class="text-4xl font-extrabold" [ngClass]="overallRiskScore() > 60 ? 'text-red-400' : overallRiskScore() > 35 ? 'text-amber-400' : 'text-brand-400'">{{ overallRiskScore() }}</p>
+    </div>
+    <a routerLink="/app/alerts" class="rounded-2xl bg-white/5 border border-white/10 p-5 hover:bg-white/10 transition">
+      <p class="text-ink-400 text-xs uppercase tracking-wide mb-2">Open / Critical Alerts</p>
+      <p class="text-4xl font-extrabold text-red-400">{{ criticalAlerts().length }}</p>
+    </a>
+    <a routerLink="/app/my-clients" class="rounded-2xl bg-white/5 border border-white/10 p-5 hover:bg-white/10 transition">
+      <p class="text-ink-400 text-xs uppercase tracking-wide mb-2">High-Risk Customers</p>
+      <p class="text-4xl font-extrabold text-amber-400">{{ highRiskCustomers().length }}</p>
+    </a>
+    <a routerLink="/app/cases" class="rounded-2xl bg-white/5 border border-white/10 p-5 hover:bg-white/10 transition">
+      <p class="text-ink-400 text-xs uppercase tracking-wide mb-2">Active Investigations</p>
+      <p class="text-4xl font-extrabold text-blue-400">{{ activeInvestigations().length }}</p>
+    </a>
+  </div>
+
+  <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
+    <div class="rounded-2xl bg-white/5 border border-white/10 p-5">
+      <p class="text-ink-400 text-xs uppercase tracking-wide mb-2">PEPs on File</p>
+      <p class="text-3xl font-bold">{{ pepCount() }}</p>
+    </div>
+    <div class="rounded-2xl bg-white/5 border border-white/10 p-5">
+      <p class="text-ink-400 text-xs uppercase tracking-wide mb-2">Sanctions Hits</p>
+      <p class="text-3xl font-bold">{{ sanctionsHits() }}</p>
+    </div>
+    <a routerLink="/app/str-sar" class="rounded-2xl bg-white/5 border border-white/10 p-5 hover:bg-white/10 transition">
+      <p class="text-ink-400 text-xs uppercase tracking-wide mb-2">Pending STR/SAR</p>
+      <p class="text-3xl font-bold">{{ pendingStrs().length }}</p>
+    </a>
+    <a routerLink="/app/regulatory-calendar" class="rounded-2xl bg-white/5 border border-white/10 p-5 hover:bg-white/10 transition">
+      <p class="text-ink-400 text-xs uppercase tracking-wide mb-2">Regulatory Deadlines This Week</p>
+      <p class="text-3xl font-bold text-amber-400">{{ overdueObligations().length }}</p>
+    </a>
+  </div>
+
+  <div class="rounded-2xl bg-white/5 border border-white/10 overflow-hidden">
+    <div class="px-5 py-4 border-b border-white/10 font-semibold">Critical Watch List</div>
+    <div class="divide-y divide-white/5">
+      <a *ngFor="let a of criticalAlerts()" [routerLink]="['/app/my-clients', a.customerId]" class="flex items-center justify-between px-5 py-3 hover:bg-white/5 transition">
+        <div>
+          <p class="text-sm font-medium">{{ a.customerName }}</p>
+          <p class="text-xs text-ink-400">{{ a.ruleTriggered }}</p>
+        </div>
+        <span class="badge-red">{{ a.severity }}</span>
+      </a>
+      <p class="px-5 py-6 text-sm text-ink-500" *ngIf="!criticalAlerts().length">No critical or high-severity alerts open.</p>
+    </div>
+  </div>
+</div>
+
+<div *ngIf="loading" class="flex items-center justify-center py-24 text-ink-400">Loading war room...</div>

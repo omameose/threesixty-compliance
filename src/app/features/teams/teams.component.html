@@ -1,0 +1,75 @@
+<app-page-header title="Teams" subtitle="Manage who has access to your compliance workspace.">
+  <button class="btn-secondary" (click)="rolesLegendOpen.set(true)"><app-icon name="info" [size]="16"></app-icon> Role Levels</button>
+  <button class="btn-primary" (click)="inviteModalOpen.set(true)"><app-icon name="plus" [size]="16"></app-icon> Invite Member</button>
+</app-page-header>
+
+<div class="card overflow-x-auto" *ngIf="!loading">
+  <table class="table">
+    <thead><tr><th>Member</th><th>Role</th><th>Status</th><th>Invited</th><th>Last Active</th><th></th></tr></thead>
+    <tbody>
+      <tr *ngFor="let m of members">
+        <td>
+          <div class="flex items-center gap-3">
+            <app-avatar [name]="m.name" [size]="34"></app-avatar>
+            <div>
+              <p class="font-medium text-ink-900">{{ m.name }}</p>
+              <p class="text-xs text-ink-400">{{ m.email }}</p>
+            </div>
+          </div>
+        </td>
+        <td>
+          <select class="input !w-auto !py-1.5 !text-xs" [ngModel]="m.role" (ngModelChange)="updateRole(m, $event)">
+            <option *ngFor="let r of roles" [value]="r.level">L{{ r.level }} — {{ r.name }}</option>
+          </select>
+        </td>
+        <td>
+          <span *ngIf="m.status === 'active'" class="badge-green">Active</span>
+          <span *ngIf="m.status === 'invited'" class="badge-yellow">Invited</span>
+          <span *ngIf="m.status === 'suspended'" class="badge-red">Suspended</span>
+        </td>
+        <td class="text-sm text-ink-500">{{ m.invitedAt }}</td>
+        <td class="text-sm text-ink-500">{{ m.lastActive }}</td>
+        <td>
+          <button class="p-2 text-ink-400 hover:text-red-500" (click)="removeTarget.set(m)">
+            <app-icon name="trash" [size]="16"></app-icon>
+          </button>
+        </td>
+      </tr>
+    </tbody>
+  </table>
+</div>
+
+<app-modal [open]="inviteModalOpen()" title="Invite a team member" subtitle="They'll receive an email invitation to join your workspace." (close)="inviteModalOpen.set(false)">
+  <div class="space-y-4">
+    <div>
+      <label class="label">Email address</label>
+      <input class="input" type="email" [(ngModel)]="inviteEmail" placeholder="colleague@company.com"/>
+    </div>
+    <div>
+      <label class="label">Access Level</label>
+      <select class="input" [(ngModel)]="inviteRole">
+        <option *ngFor="let r of roles" [value]="r.level">L{{ r.level }} — {{ r.name }}</option>
+      </select>
+      <p class="text-xs text-ink-400 mt-1.5">{{ roles[inviteRole-1]?.description }}</p>
+    </div>
+  </div>
+  <div modal-footer class="flex gap-3 w-full sm:w-auto">
+    <button class="btn-secondary flex-1" (click)="inviteModalOpen.set(false)">Cancel</button>
+    <button class="btn-primary flex-1" [disabled]="!inviteEmail.trim() || inviting" (click)="invite()">{{ inviting ? 'Sending...' : 'Send Invite' }}</button>
+  </div>
+</app-modal>
+
+<app-modal [open]="rolesLegendOpen()" title="Access Levels" subtitle="From Level 1 (Viewer) to Level 7 (Super Admin)." (close)="rolesLegendOpen.set(false)">
+  <div class="space-y-3">
+    <div class="flex gap-3 p-3 rounded-lg bg-ink-50" *ngFor="let r of roles">
+      <span class="w-8 h-8 rounded-full bg-brand-600 text-white text-xs font-bold flex items-center justify-center shrink-0">L{{ r.level }}</span>
+      <div>
+        <p class="font-medium text-ink-900 text-sm">{{ r.name }}</p>
+        <p class="text-xs text-ink-500">{{ r.description }}</p>
+      </div>
+    </div>
+  </div>
+  <div modal-footer class="w-full sm:w-auto">
+    <button class="btn-primary w-full sm:w-auto" (click)="rolesLegendOpen.set(false)">Got it</button>
+  </div>
+</app-modal>

@@ -1,0 +1,47 @@
+<app-page-header title="Profile" subtitle="Manage your personal account information."></app-page-header>
+
+<div class="max-w-2xl space-y-5" *ngIf="user">
+  <div class="card p-6">
+    <div class="flex items-center gap-5 mb-6">
+      <app-avatar [name]="user.firstName + ' ' + user.lastName" [size]="72"></app-avatar>
+      <div>
+        <p class="font-semibold text-ink-900 text-lg">{{ user.firstName }} {{ user.lastName }}</p>
+        <p class="muted">{{ user.email }}</p>
+        <span class="badge-green mt-2">{{ roleName() }}</span>
+      </div>
+    </div>
+
+    <div class="grid sm:grid-cols-2 gap-4">
+      <div>
+        <label class="label">First Name</label>
+        <input class="input" [(ngModel)]="user.firstName"/>
+      </div>
+      <div>
+        <label class="label">Last Name</label>
+        <input class="input" [(ngModel)]="user.lastName"/>
+      </div>
+      <div>
+        <label class="label">Email Address</label>
+        <input class="input" [(ngModel)]="user.email"/>
+      </div>
+      <div>
+        <label class="label">Phone Number</label>
+        <input class="input" [(ngModel)]="user.phone"/>
+      </div>
+    </div>
+
+    <div class="flex justify-end gap-3 mt-6">
+      <span *ngIf="saved()" class="text-sm text-brand-600 self-center">Profile updated!</span>
+      <button class="btn-primary" [disabled]="saving" (click)="save()">{{ saving ? 'Saving...' : 'Save Changes' }}</button>
+    </div>
+  </div>
+
+  <div class="card p-6">
+    <h3 class="font-semibold text-ink-900 mb-4">Account Details</h3>
+    <div class="space-y-3 text-sm">
+      <div class="flex justify-between"><span class="text-ink-500">Access Level</span><span class="font-medium text-ink-800">{{ roleName() }}</span></div>
+      <div class="flex justify-between"><span class="text-ink-500">Two-Factor Authentication</span><span class="font-medium" [class.text-brand-600]="user.twoFactorEnabled" [class.text-ink-400]="!user.twoFactorEnabled">{{ user.twoFactorEnabled ? 'Enabled' : 'Disabled' }}</span></div>
+      <div class="flex justify-between"><span class="text-ink-500">Last Login</span><span class="font-medium text-ink-800">{{ user.lastLoginAt }}</span></div>
+    </div>
+  </div>
+</div>

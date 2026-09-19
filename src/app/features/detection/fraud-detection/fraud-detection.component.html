@@ -1,0 +1,122 @@
+<app-page-header title="Fraud Detection Engine" subtitle="Detects account takeover, mule accounts, social engineering and collusive-merchant fraud typologies.">
+</app-page-header>
+
+<div class="fixed bottom-6 right-6 z-40 bg-ink-900 text-white text-sm px-4 py-3 rounded-lg shadow-lg fade-in" *ngIf="toast()">{{ toast() }}</div>
+
+<div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-4 mb-6" *ngIf="!loading">
+  <div class="card p-5" *ngFor="let s of typologies()">
+    <p class="muted mb-1">{{ s.label }}</p>
+    <p class="text-2xl font-bold text-ink-900">{{ s.count }} <span class="text-sm font-medium text-ink-400">hits</span></p>
+  </div>
+</div>
+
+<div class="grid lg:grid-cols-5 gap-5" *ngIf="!loading">
+  <div class="lg:col-span-3 space-y-4">
+    <div class="flex flex-col sm:flex-row gap-3">
+      <div class="relative flex-1">
+        <app-icon name="search" [size]="16" class="absolute left-3 top-1/2 -translate-y-1/2 text-ink-400"></app-icon>
+        <input class="input pl-9" placeholder="Search by customer or typology..." [(ngModel)]="query"/>
+      </div>
+      <select class="input !w-auto" [(ngModel)]="statusFilter">
+        <option value="all">All statuses</option>
+        <option value="new">New</option>
+        <option value="reviewing">Reviewing</option>
+        <option value="escalated">Escalated</option>
+        <option value="cleared">Cleared</option>
+      </select>
+    </div>
+
+    <div class="card overflow-x-auto">
+      <table class="table">
+        <thead><tr><th>Customer</th><th>Typology</th><th>Channel</th><th>Risk</th><th>Decision</th><th>Status</th></tr></thead>
+        <tbody>
+          <tr *ngFor="let h of filtered()" class="cursor-pointer" [class.bg-brand-50]="selected()?.id === h.id" (click)="select(h)">
+            <td class="font-medium text-ink-900">{{ h.customerName }}</td>
+            <td class="text-sm text-ink-600">{{ h.typology }}</td>
+            <td><span class="badge-blue">{{ h.channel }}</span></td>
+            <td><span class="badge-red" *ngIf="h.riskScore >= 70">{{ h.riskScore }}</span><span class="badge-yellow" *ngIf="h.riskScore < 70 && h.riskScore >= 40">{{ h.riskScore }}</span><span class="badge-gray" *ngIf="h.riskScore < 40">{{ h.riskScore }}</span></td>
+            <td>
+              <span [ngClass]="decisionBadge(effectiveDecision(h))">{{ effectiveDecision(h) }}</span>
+              <app-icon *ngIf="h.overrideDecision" name="edit" [size]="12" class="text-ink-400 ml-1" title="Overridden"></app-icon>
+            </td>
+            <td><span [ngClass]="statusBadge(h.status)">{{ h.status }}</span></td>
+          </tr>
+        </tbody>
+      </table>
+      <div *ngIf="!filtered().length" class="py-10 text-center text-sm text-ink-400">No hits match your filters.</div>
+    </div>
+  </div>
+
+  <div class="lg:col-span-2">
+    <div class="card p-5 sticky top-6" *ngIf="selected() as h">
+      <div class="flex items-start justify-between mb-4">
+        <div>
+          <a [routerLink]="['/app/my-clients', h.customerId]" class="font-semibold text-ink-900 text-lg hover:text-brand-600">{{ h.customerName }}</a>
+          <p class="text-xs text-ink-400">{{ h.typology }} &middot; {{ h.channel }}</p>
+        </div>
+        <span [ngClass]="statusBadge(h.status)">{{ h.status }}</span>
+      </div>
+
+      <div class="grid grid-cols-2 gap-3 text-sm mb-4">
+        <div><p class="text-ink-400 text-xs">Fraud Score</p><p class="font-semibold text-ink-900">{{ h.riskScore }}/100</p></div>
+        <div><p class="text-ink-400 text-xs">Decision</p><span [ngClass]="decisionBadge(effectiveDecision(h))">{{ effectiveDecision(h) }}</span></div>
+        <div *ngIf="h.deviceId"><p class="text-ink-400 text-xs">Device</p><p class="font-mono text-xs text-ink-700">{{ h.deviceId }}</p></div>
+        <div><p class="text-ink-400 text-xs">Detected</p><p class="font-medium text-ink-800">{{ h.detectedAt }}</p></div>
+      </div>
+
+      <div class="rounded-lg bg-ink-50 p-4 mb-4">
+        <p class="text-xs font-semibold uppercase tracking-wide text-ink-400 mb-2">Explainable Signals</p>
+        <ul class="space-y-1.5 text-sm text-ink-700">
+          <li class="flex gap-2" *ngFor="let s of h.signals"><app-icon name="alert-triangle" [size]="13" class="text-amber-500 shrink-0 mt-0.5"></app-icon> {{ s }}</li>
+        </ul>
+      </div>
+
+      <div class="rounded-lg bg-amber-50 p-4 mb-4" *ngIf="h.overrideDecision">
+        <p class="text-xs font-semibold uppercase tracking-wide text-amber-600 mb-1">Analyst Override</p>
+        <p class="text-sm text-ink-800">Changed to <strong>{{ h.overrideDecision }}</strong> by {{ h.overriddenBy }} on {{ h.overriddenAt }}</p>
+        <p class="text-sm text-ink-600 mt-1">{{ h.overrideReason }}</p>
+      </div>
+
+      <div class="grid grid-cols-2 gap-2 mb-2">
+        <button class="btn-secondary btn-sm justify-center" *ngIf="h.status === 'new'" (click)="setStatus(h,'reviewing')">Mark Reviewing</button>
+        <button class="btn-secondary btn-sm justify-center" [disabled]="h.status === 'cleared'" (click)="setStatus(h,'cleared')">Clear</button>
+      </div>
+      <div class="grid grid-cols-2 gap-2 mb-5">
+        <button class="btn-primary btn-sm justify-center" [disabled]="h.status === 'escalated'" (click)="setStatus(h,'escalated')">Escalate</button>
+        <button class="btn-secondary btn-sm justify-center" (click)="openOverride()">Override Decision</button>
+      </div>
+
+      <a *ngIf="h.linkedCaseId" [routerLink]="['/app/cases', h.linkedCaseId]" class="text-sm text-brand-600 hover:underline flex items-center gap-1.5">
+        <app-icon name="folder" [size]="14"></app-icon> View linked case
+      </a>
+    </div>
+
+    <div class="card" *ngIf="!selected()">
+      <app-empty-state icon="alert-triangle" title="Select a hit" subtitle="Click a row on the left to review fraud signals and the recommended decision."></app-empty-state>
+    </div>
+  </div>
+</div>
+
+<div *ngIf="loading" class="flex items-center justify-center py-24 text-ink-400">Loading fraud detection queue...</div>
+
+<app-modal [open]="overrideModalOpen()" title="Override Fraud Decision" subtitle="Recorded permanently with your name and reason for audit purposes." (close)="overrideModalOpen.set(false)">
+  <div class="space-y-4">
+    <div>
+      <label class="label">New Decision</label>
+      <select class="input" [(ngModel)]="overrideDecision">
+        <option value="ALLOW">ALLOW</option>
+        <option value="REVIEW">REVIEW</option>
+        <option value="CHALLENGE">CHALLENGE</option>
+        <option value="BLOCK">BLOCK</option>
+      </select>
+    </div>
+    <div>
+      <label class="label">Reason for Override</label>
+      <textarea class="input" rows="3" [(ngModel)]="overrideReason" placeholder="e.g. Confirmed legitimate activity after customer call-back verification."></textarea>
+    </div>
+  </div>
+  <div modal-footer class="flex gap-3 w-full sm:w-auto">
+    <button class="btn-secondary flex-1" (click)="overrideModalOpen.set(false)">Cancel</button>
+    <button class="btn-primary flex-1" [disabled]="!overrideReason.trim()" (click)="confirmOverride()">Save Override</button>
+  </div>
+</app-modal>
