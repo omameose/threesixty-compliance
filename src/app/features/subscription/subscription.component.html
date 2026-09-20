@@ -111,7 +111,9 @@
 
     <ng-container *ngIf="!isDowngrade()">
       <label class="flex items-center gap-2 py-1" *ngFor="let g of gateways">
-        <input type="radio" name="payWith" [value]="g.key" [(ngModel)]="payWith"/> Pay with {{ g.name }} <span class="text-xs text-ink-400">(secure page, opens in this window)</span>
+        <input type="radio" name="payWith" [value]="g.key" [(ngModel)]="payWith"/>
+        <ng-container *ngIf="g.flow === 'card'">Pay by card <span class="text-xs text-ink-400">({{ g.name }}, secure form)</span></ng-container>
+        <ng-container *ngIf="g.flow !== 'card'">Pay with {{ g.name }} <span class="text-xs text-ink-400">(secure page, opens in this window)</span></ng-container>
       </label>
       <label class="flex items-center gap-2 py-1" *ngIf="testCardsAvailable || subscription?.paymentMethod">
         <input type="radio" name="payWith" value="card" [(ngModel)]="payWith"/> {{ subscription?.paymentMethod ? 'Card on file' : 'Test card' }}
@@ -119,7 +121,9 @@
       <p *ngIf="!gateways.length && !testCardsAvailable && !subscription?.paymentMethod" class="text-red-700">No payment method is available right now. Please try again later or contact support.</p>
 
       <p *ngIf="usesGateway()" class="text-xs text-ink-500 mt-2">
-        You will pay on {{ payWith }}'s own page; your card details never reach our servers. Your plan changes as soon as the payment is confirmed.
+        <ng-container *ngIf="selectedGateway()?.flow === 'card'">You will enter your card on the next screen. It is encrypted before it is sent to the payment provider and is never stored by us.</ng-container>
+        <ng-container *ngIf="selectedGateway()?.flow !== 'card'">You will pay on {{ payWith }}'s own page; your card details never reach our servers.</ng-container>
+        Your plan changes as soon as the payment is confirmed.
         <ng-container *ngIf="targetPlan?.trialDays && subscription?.planId === 'free'"> Paying this way starts the plan straight away, without the free trial.</ng-container>
       </p>
 

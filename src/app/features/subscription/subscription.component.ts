@@ -1,4 +1,5 @@
 import { CommonModule } from '@angular/common';
+import { Router } from '@angular/router';
 import { Component, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ApiError } from '../../core/http/api.service';
@@ -41,7 +42,7 @@ export class SubscriptionComponent implements OnInit {
   /** One key per user decision. It is created when the confirmation opens and reused if the request has to be retried. */
   private idempotencyKey = '';
 
-  constructor(private api: SubscriptionApiService, public auth: AuthService) {}
+  constructor(private api: SubscriptionApiService, public auth: AuthService, private router: Router) {}
 
   get canManage(): boolean {
     return this.auth.hasMinRole(6);
@@ -108,6 +109,10 @@ export class SubscriptionComponent implements OnInit {
     return price(this.targetPlan) < price(cur);
   }
 
+  selectedGateway(): GatewayOption | undefined {
+    return this.gateways.find(g => g.key === this.payWith);
+  }
+
   usesGateway(): boolean {
     return this.payWith !== 'card' && !this.isDowngrade();
   }
@@ -144,7 +149,10 @@ export class SubscriptionComponent implements OnInit {
     this.actionError.set('');
     this.api.startCheckout({ planId: this.targetPlan!.id, billingCycle: this.billingCycle, gateway: this.payWith }, this.idempotencyKey).subscribe({
       next: c => {
-        if (c.checkoutUrl) {
+        if (c.flow === 'card') {
+          // Our own page: stay inside the app.
+          this.router.navigate(['/app/subscription/card', c.reference]);
+        } else if (c.checkoutUrl) {
           window.location.href = c.checkoutUrl;
         } else {
           this.submitting.set(false);

@@ -12,13 +12,40 @@ export interface ChangePlanRequest {
   paymentToken?: string;
 }
 
-export interface GatewayOption { key: string; name: string; }
+/** `flow`: hosted = the customer is sent to the gateway's own page; card = the customer types the card on our checkout page. */
+export interface GatewayOption { key: string; name: string; flow: 'hosted' | 'card'; }
 
 /** A payment on a gateway's own page. `checkoutUrl` is only present while it can still be paid. */
 export interface Checkout {
   reference: string; gateway: string; gatewayName: string; status: 'initiated' | 'pending' | 'success' | 'failed' | 'abandoned';
   checkoutUrl?: string; amount: number; currency: string; invoiceNumber: string; description?: string; failureReason?: string;
   planUpdated: boolean; createdAt: string;
+  flow: 'hosted' | 'card';
+  /** Card payments only: the step the bank is waiting for. */
+  authorizationType?: 'OTP' | 'PIN' | 'AVS' | 'REDIRECT' | null;
+  authorizationLink?: string | null;
+  /** True once a card has been sent for this payment (it can only be sent once). */
+  cardSubmitted: boolean;
+}
+
+/** What the customer typed on the card page. Sent once over the encrypted connection; the server encrypts it for the gateway. */
+export interface CardForm {
+  cardHolderName: string; cardNumber: string; expiryMonth: string; expiryYear: string; cvv: string;
+  firstName: string; middleName?: string; lastName: string; dialCode: string; phone: string;
+  country: string; countryName: string; state: string; city: string; postalCode: string; line1: string; line2?: string;
+}
+
+export interface AuthorizeForm {
+  authorizationType: 'OTP' | 'PIN' | 'AVS';
+  otp?: string; pin?: string;
+  country?: string; countryName?: string; state?: string; city?: string; postalCode?: string; line1?: string; line2?: string;
+}
+
+/** `outcome`: needs_authorization, redirect, submitted, retry, declined or unknown. */
+export interface CardStep {
+  checkout: Checkout;
+  outcome: 'needs_authorization' | 'redirect' | 'submitted' | 'retry' | 'declined' | 'unknown';
+  message: string;
 }
 
 interface PlanDto {
@@ -109,6 +136,21 @@ export class SubscriptionApiService {
   /** Asks the gateway (through our server) how the payment went. Safe to call repeatedly. */
   verifyCheckout(reference: string): Observable<Checkout> {
     return this.api.post<Checkout>(`/subscription/checkout/${encodeURIComponent(reference)}/verify`, {});
+  }
+
+  /** Stored state of a payment, no call to the gateway. */
+  getCheckout(reference: string): Observable<Checkout> {
+    return this.api.get<Checkout>(`/subscription/checkout/${encodeURIComponent(reference)}`);
+  }
+
+  /** Card gateways: sends the card. Allowed once per payment. */
+  submitCard(reference: string, card: CardForm): Observable<CardStep> {
+    return this.api.post<CardStep>(`/subscription/checkout/${encodeURIComponent(reference)}/card`, card);
+  }
+
+  /** Card gateways: the OTP, PIN or address the bank asked for. */
+  authorizeCard(reference: string, step: AuthorizeForm): Observable<CardStep> {
+    return this.api.post<CardStep>(`/subscription/checkout/${encodeURIComponent(reference)}/authorize`, step);
   }
 
   cancelCheckout(reference: string): Observable<Checkout> {
