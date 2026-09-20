@@ -78,14 +78,14 @@
     </nav>
 
     <div class="p-3 border-t border-ink-100 shrink-0">
-      <div *ngIf="!sidebarCollapsed() && trialBannerVisible()" class="bg-brand-50 rounded-xl p-3.5 mb-2 relative">
-        <button class="absolute top-2 right-2 text-ink-400 hover:text-ink-600" (click)="trialBannerVisible.set(false)">
+      <div *ngIf="!sidebarCollapsed() && trialBannerVisible() && plan() as p" class="bg-brand-50 rounded-xl p-3.5 mb-2 relative">
+        <button class="absolute top-2 right-2 text-ink-400 hover:text-ink-600" (click)="trialBannerVisible.set(false)" aria-label="Dismiss">
           <app-icon name="x" [size]="14"></app-icon>
         </button>
-        <p class="text-sm font-semibold text-ink-900 mb-1">Standard Plan</p>
-        <p class="text-xs text-ink-500 mb-3">1,840 / 2,500 verifications used this cycle.</p>
+        <p class="text-sm font-semibold text-ink-900 mb-1">{{ p.name }} plan<span *ngIf="p.status === 'trialing'"> (trial)</span></p>
+        <p class="text-xs text-ink-500 mb-3">{{ p.used }} / {{ p.included < 0 ? 'unlimited' : p.included }} verifications used this cycle.</p>
         <div class="w-full h-1.5 bg-white rounded-full mb-3 overflow-hidden">
-          <div class="h-full bg-brand-600 rounded-full" style="width: 73.6%"></div>
+          <div class="h-full bg-brand-600 rounded-full" [style.width.%]="p.percent"></div>
         </div>
         <a routerLink="/app/subscription" class="text-xs font-semibold text-brand-700 hover:underline">Manage plan &rarr;</a>
       </div>
@@ -166,6 +166,14 @@
     </header>
 
     <main class="flex-1 overflow-y-auto p-4 sm:p-6">
+      <div *ngIf="auth.currentUser() && auth.currentUser()?.companyApproved === false && !onVerificationPage()"
+           class="mb-5 p-4 rounded-xl border border-amber-200 bg-amber-50 text-amber-900 flex flex-wrap items-center justify-between gap-3" role="status">
+        <div>
+          <p class="font-semibold">Verify your company to unlock 360 Compliance.</p>
+          <p class="text-sm">Most features stay locked until your company verification is approved.</p>
+        </div>
+        <a routerLink="/app/verification-kyc" class="btn-primary">Continue verification</a>
+      </div>
       <router-outlet></router-outlet>
     </main>
   </div>

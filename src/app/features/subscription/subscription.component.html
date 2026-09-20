@@ -1,63 +1,86 @@
 <app-page-header title="Subscription" subtitle="Manage your plan, usage and billing history."></app-page-header>
 
+<div *ngIf="loadError" class="mb-4 p-3 rounded-lg bg-red-50 text-red-700 text-sm" role="alert">{{ loadError }}</div>
+<div *ngIf="notice()" class="mb-4 p-3 rounded-lg bg-brand-50 text-brand-800 text-sm flex justify-between" role="status">
+  {{ notice() }} <button class="text-brand-700 underline" (click)="notice.set('')">Dismiss</button>
+</div>
+<div *ngIf="!canManage" class="mb-4 p-3 rounded-lg bg-ink-50 text-ink-600 text-sm">Only company admins can change the plan or see invoices. You can view the plan and usage.</div>
+
+<div *ngIf="loading && !subscription" class="muted mb-6">Loading your subscription...</div>
+
 <div class="grid lg:grid-cols-3 gap-5 mb-8" *ngIf="subscription">
   <div class="card p-6 lg:col-span-2">
     <div class="flex items-center justify-between mb-4">
       <div>
         <p class="muted mb-1">Current Plan</p>
-        <h2 class="text-2xl font-bold text-ink-950">{{ currentPlan()?.name }}</h2>
+        <h2 class="text-2xl font-bold text-ink-950">{{ currentPlan()?.name || subscription.planId }}</h2>
       </div>
-      <span [ngClass]="subscription.status === 'active' ? 'badge-green' : subscription.status === 'canceled' ? 'badge-red' : 'badge-yellow'">
-        {{ subscription.status }}
+      <span [ngClass]="subscription.status === 'active' ? 'badge-green' : subscription.status === 'past_due' ? 'badge-red' : 'badge-yellow'">
+        {{ subscription.status === 'past_due' ? 'payment due' : subscription.status }}
       </span>
     </div>
-    <p class="muted mb-4">Renews on {{ subscription.renewsAt }} &middot; {{ subscription.seats }} team seats</p>
+
+    <p class="muted mb-2" *ngIf="subscription.status === 'trialing'">Free trial until {{ subscription.trialEndsAt }}. You will be charged ${{ subscription.nextChargeAmount }} then, unless you cancel first.</p>
+    <p class="muted mb-2" *ngIf="subscription.status !== 'trialing'">
+      {{ subscription.cancelAtPeriodEnd ? 'Ends on' : 'Renews on' }} {{ subscription.renewsAt }} &middot; {{ subscription.seats }} team seats
+      <ng-container *ngIf="subscription.paymentMethod"> &middot; card {{ subscription.paymentMethod.brand }} ending {{ subscription.paymentMethod.last4 }}</ng-container>
+    </p>
+    <p class="text-sm text-amber-700 mb-2" *ngIf="subscription.pendingPlanId">Switching to <strong>{{ subscription.pendingPlanId }}</strong> when the current period ends.</p>
+    <p class="text-sm text-red-700 mb-2" *ngIf="subscription.status === 'past_due'">We could not collect your last payment. We will try again on {{ subscription.nextRetryAt | date: 'mediumDate' }}. Update your card by choosing a plan below.</p>
+
     <div class="mb-2 flex items-center justify-between text-sm">
-      <span class="text-ink-600">{{ subscription.usage.used }} / {{ subscription.usage.included }} verifications used</span>
-      <span class="font-medium text-ink-800">{{ usagePercent() }}%</span>
+      <span class="text-ink-600">{{ subscription.usage.used }} / {{ subscription.usage.included < 0 ? 'unlimited' : subscription.usage.included }} verifications used</span>
+      <span class="font-medium text-ink-800" *ngIf="subscription.usage.included > 0">{{ usagePercent() }}%</span>
     </div>
     <div class="w-full h-2.5 bg-ink-100 rounded-full overflow-hidden mb-6">
       <div class="h-full bg-brand-600 rounded-full" [style.width.%]="usagePercent()"></div>
     </div>
-    <div class="flex gap-3">
-      <button class="btn-danger" (click)="cancelModalOpen.set(true)" *ngIf="subscription.status === 'active'">Cancel Subscription</button>
+    <div class="flex gap-3" *ngIf="canManage">
+      <button class="btn-danger" (click)="openCancel()" *ngIf="subscription.planId !== 'free' && !subscription.cancelAtPeriodEnd" [disabled]="submitting()">Cancel Subscription</button>
+      <button class="btn-secondary" (click)="resume()" *ngIf="subscription.cancelAtPeriodEnd || subscription.pendingPlanId" [disabled]="submitting()">Keep my plan</button>
     </div>
   </div>
 
   <div class="card p-6">
     <h3 class="font-semibold text-ink-900 mb-3">Need more verifications?</h3>
-    <p class="muted mb-4">Upgrade your plan anytime — changes apply immediately with prorated billing.</p>
+    <p class="muted mb-4">Upgrades take effect immediately with credit for the time you have not used. Downgrades start at the end of the period you paid for.</p>
     <a href="#plans" class="btn-primary w-full justify-center">View Plans</a>
   </div>
 </div>
 
 <div id="plans" class="mb-8">
-  <h3 class="section-title mb-4">Available Plans</h3>
+  <div class="flex items-center justify-between mb-4">
+    <h3 class="section-title">Available Plans</h3>
+    <div class="inline-flex rounded-lg border border-ink-200 p-0.5 text-sm">
+      <button class="px-3 py-1 rounded-md" [class.bg-brand-600]="billingCycle === 'month'" [class.text-white]="billingCycle === 'month'" (click)="billingCycle = 'month'">Monthly</button>
+      <button class="px-3 py-1 rounded-md" [class.bg-brand-600]="billingCycle === 'year'" [class.text-white]="billingCycle === 'year'" (click)="billingCycle = 'year'">Yearly</button>
+    </div>
+  </div>
   <div class="grid sm:grid-cols-2 lg:grid-cols-4 gap-5">
     <div class="card p-6 flex flex-col" [class.border-2]="plan.highlighted" [class.border-brand-500]="plan.highlighted" *ngFor="let plan of plans">
       <span *ngIf="plan.highlighted" class="badge-green w-fit mb-3">Most Popular</span>
       <p class="font-semibold text-ink-900">{{ plan.name }}</p>
-      <p class="text-3xl font-extrabold my-2" *ngIf="plan.id !== 'enterprise'">${{ plan.price }}<span class="text-sm font-medium text-ink-400" *ngIf="plan.price">/mo</span></p>
-      <p class="text-3xl font-extrabold my-2" *ngIf="plan.id === 'enterprise'">Custom</p>
+      <p class="text-3xl font-extrabold my-2" *ngIf="!plan.customPricing">{{ priceLabel(plan) }}<span class="text-sm font-medium text-ink-400" *ngIf="plan.price">/{{ billingCycle === 'year' ? 'yr' : 'mo' }}</span></p>
+      <p class="text-3xl font-extrabold my-2" *ngIf="plan.customPricing">Custom</p>
       <p class="muted mb-4">{{ plan.description }}</p>
       <ul class="space-y-2 mb-6 flex-1">
         <li class="flex items-start gap-2 text-sm text-ink-600" *ngFor="let f of plan.features">
           <app-icon name="check" [size]="14" class="text-brand-600 shrink-0 mt-0.5"></app-icon> {{ f }}
         </li>
       </ul>
-      <button *ngIf="plan.id !== subscription?.planId" class="btn-primary w-full justify-center" (click)="openChange(plan)">
-        {{ plan.id === 'enterprise' ? 'Contact Sales' : 'Switch to ' + plan.name }}
+      <button *ngIf="plan.id !== subscription?.planId" class="btn-primary w-full justify-center" (click)="openChange(plan)" [disabled]="!canManage || submitting()">
+        {{ plan.customPricing ? 'Contact Sales' : plan.trialDays && subscription?.planId === 'free' ? 'Start ' + plan.trialDays + '-day trial' : 'Switch to ' + plan.name }}
       </button>
       <button *ngIf="plan.id === subscription?.planId" class="btn-secondary w-full justify-center" disabled>Current Plan</button>
     </div>
   </div>
 </div>
 
-<div>
+<div *ngIf="canManage">
   <h3 class="section-title mb-4">Billing History</h3>
   <div class="card overflow-x-auto">
     <table class="table">
-      <thead><tr><th>Invoice</th><th>Plan</th><th>Amount</th><th>Status</th><th>Date</th><th></th></tr></thead>
+      <thead><tr><th>Invoice</th><th>Plan</th><th>Amount</th><th>Status</th><th>Date</th></tr></thead>
       <tbody>
         <tr *ngFor="let inv of invoices">
           <td class="font-mono text-xs text-ink-700">{{ inv.id }}</td>
@@ -69,25 +92,47 @@
             <span *ngIf="inv.status === 'failed'" class="badge-red">Failed</span>
           </td>
           <td class="text-sm text-ink-500">{{ inv.date }}</td>
-          <td><a [href]="inv.invoiceUrl" class="btn-secondary btn-sm"><app-icon name="download" [size]="13"></app-icon> Download</a></td>
         </tr>
+        <tr *ngIf="!invoices.length"><td colspan="5" class="text-center text-sm text-ink-400 py-6">No invoices yet.</td></tr>
       </tbody>
     </table>
   </div>
 </div>
 
-<app-modal [open]="changeModalOpen()" title="Confirm plan change" (close)="changeModalOpen.set(false)">
-  <p class="text-sm text-ink-600">Switch to the <strong>{{ targetPlan?.name }}</strong> plan? Your billing will be prorated for the remainder of this cycle.</p>
+<app-modal [open]="changeModalOpen()" title="Confirm plan change" (close)="!submitting() && changeModalOpen.set(false)">
+  <p class="text-sm text-ink-600 mb-4">
+    Switch to the <strong>{{ targetPlan?.name }}</strong> plan ({{ targetPlan ? priceLabel(targetPlan) : '' }}/{{ billingCycle === 'year' ? 'year' : 'month' }})?
+    <ng-container *ngIf="targetPlan?.trialDays && subscription?.planId === 'free'">You start with a {{ targetPlan?.trialDays }}-day free trial and are not charged until it ends.</ng-container>
+  </p>
+
+  <div class="mb-4 p-3 rounded-lg bg-ink-50 text-sm">
+    <p class="font-medium text-ink-800 mb-1">Payment method</p>
+    <p *ngIf="subscription?.paymentMethod && !useNewCard" class="text-ink-600">
+      {{ subscription?.paymentMethod?.brand }} ending {{ subscription?.paymentMethod?.last4 }}
+      <button class="text-brand-600 underline ml-2" (click)="useNewCard = true">use another card</button>
+    </p>
+    <div *ngIf="useNewCard || !subscription?.paymentMethod">
+      <p class="text-xs text-ink-500 mb-2">Sandbox mode: no real card is charged. Real card details will be entered in the payment provider's secure form and never reach our servers.</p>
+      <select class="input" [(ngModel)]="sandboxCard" name="card">
+        <option value="approved">Test card: payment approved</option>
+        <option value="declined">Test card: payment declined</option>
+        <option value="insufficient">Test card: insufficient funds</option>
+      </select>
+    </div>
+  </div>
+
+  <div *ngIf="actionError()" class="p-3 rounded-lg bg-red-50 text-red-700 text-sm" role="alert">{{ actionError() }}</div>
   <div modal-footer class="flex gap-3 w-full sm:w-auto">
-    <button class="btn-secondary flex-1" (click)="changeModalOpen.set(false)">Cancel</button>
-    <button class="btn-primary flex-1" (click)="confirmChange()">Confirm Switch</button>
+    <button class="btn-secondary flex-1" (click)="changeModalOpen.set(false)" [disabled]="submitting()">Cancel</button>
+    <button class="btn-primary flex-1" (click)="confirmChange()" [disabled]="submitting()">{{ submitting() ? 'Processing...' : 'Confirm Switch' }}</button>
   </div>
 </app-modal>
 
-<app-modal [open]="cancelModalOpen()" title="Cancel your subscription?" subtitle="You'll retain access until the end of your current billing cycle." (close)="cancelModalOpen.set(false)">
-  <p class="text-sm text-ink-600">Are you sure you want to cancel? You can resubscribe at any time.</p>
+<app-modal [open]="cancelModalOpen()" title="Cancel your subscription?" subtitle="You'll retain access until the end of your current billing period." (close)="!submitting() && cancelModalOpen.set(false)">
+  <p class="text-sm text-ink-600">After that you continue on the free plan. You can subscribe again at any time.</p>
+  <div *ngIf="actionError()" class="mt-3 p-3 rounded-lg bg-red-50 text-red-700 text-sm" role="alert">{{ actionError() }}</div>
   <div modal-footer class="flex gap-3 w-full sm:w-auto">
-    <button class="btn-secondary flex-1" (click)="cancelModalOpen.set(false)">Keep Subscription</button>
-    <button class="btn-danger flex-1" (click)="confirmCancel()">Cancel Subscription</button>
+    <button class="btn-secondary flex-1" (click)="cancelModalOpen.set(false)" [disabled]="submitting()">Keep Subscription</button>
+    <button class="btn-danger flex-1" (click)="confirmCancel()" [disabled]="submitting()">{{ submitting() ? 'Cancelling...' : 'Cancel Subscription' }}</button>
   </div>
 </app-modal>

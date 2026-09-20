@@ -6,6 +6,7 @@ import { IconComponent } from '../../shared/components/icon/icon.component';
 import { AvatarComponent } from '../../shared/components/avatar/avatar.component';
 import { AuthService } from '../../core/services/auth.service';
 import { DataService } from '../../core/services/data.service';
+import { SubscriptionApiService } from '../../core/services/subscription-api.service';
 
 interface NavItem { label: string; icon: string; path?: string; children?: { label: string; path: string }[]; }
 interface NavGroup { label: string; items: NavItem[]; }
@@ -117,10 +118,27 @@ export class DashboardLayoutComponent {
     this.expandedGroups.update(g => ({ ...g, [label]: !g[label] }));
   }
 
+  /** The real plan and usage (subscription-service); hidden until it loads or if it cannot be loaded. */
+  plan = signal<{ name: string; status: string; used: number; included: number; percent: number } | null>(null);
+
   company = this.dataService.company;
   user = this.auth.currentUser;
 
-  constructor(public auth: AuthService, private dataService: DataService, private router: Router) {
+  onVerificationPage(): boolean {
+    return this.router.url.startsWith('/app/verification-kyc');
+  }
+
+  constructor(public auth: AuthService, private dataService: DataService, private router: Router, private subscriptions: SubscriptionApiService) {
+    this.subscriptions.getSubscription().subscribe({
+      next: s => this.subscriptions.getPlans().subscribe({
+        next: plans => this.plan.set({
+          name: plans.find(p => p.id === s.planId)?.name ?? s.planId, status: s.status, used: s.usage.used, included: s.usage.included,
+          percent: s.usage.included > 0 ? Math.min(100, Math.round((100 * s.usage.used) / s.usage.included)) : 0
+        }),
+        error: () => {}
+      }),
+      error: () => {}
+    });
     this.router.events.pipe(filter(e => e instanceof NavigationEnd)).subscribe(() => {
       this.mobileSidebarOpen.set(false);
     });

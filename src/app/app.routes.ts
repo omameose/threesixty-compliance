@@ -14,6 +14,9 @@ export const routes: Routes = [
       { path: 'login', loadComponent: () => import('./features/auth/login/login.component').then(m => m.LoginComponent) },
       { path: 'register', loadComponent: () => import('./features/auth/register/register.component').then(m => m.RegisterComponent) },
       { path: 'forgot-password', loadComponent: () => import('./features/auth/forgot-password/forgot-password.component').then(m => m.ForgotPasswordComponent) },
+      { path: 'verify-email', loadComponent: () => import('./features/auth/verify-email/verify-email.component').then(m => m.VerifyEmailComponent) },
+      { path: 'reset-password', loadComponent: () => import('./features/auth/reset-password/reset-password.component').then(m => m.ResetPasswordComponent) },
+      { path: 'accept-invite', loadComponent: () => import('./features/auth/accept-invite/accept-invite.component').then(m => m.AcceptInviteComponent) },
       { path: 'verify-2fa', loadComponent: () => import('./features/auth/verify-2fa/verify-2fa.component').then(m => m.Verify2faComponent) }
     ]
   },
@@ -24,6 +27,7 @@ export const routes: Routes = [
     children: [
       { path: '', redirectTo: 'dashboard', pathMatch: 'full' },
       { path: 'dashboard', loadComponent: () => import('./features/dashboard-home/dashboard-home.component').then(m => m.DashboardHomeComponent), title: 'Dashboard' },
+      { path: 'verification-kyc', loadComponent: () => import('./features/kyc/kyc-wizard.component').then(m => m.KycWizardComponent), title: 'Company Verification' },
       { path: 'templates', loadComponent: () => import('./features/templates/sector-list/sector-list.component').then(m => m.SectorListComponent), title: 'Compliance Templates' },
       { path: 'templates/:sectorId', loadComponent: () => import('./features/templates/industry-list/industry-list.component').then(m => m.IndustryListComponent), title: 'Industries' },
       { path: 'templates/:sectorId/:industryId', loadComponent: () => import('./features/templates/template-list/template-list.component').then(m => m.TemplateListComponent), title: 'Templates' },

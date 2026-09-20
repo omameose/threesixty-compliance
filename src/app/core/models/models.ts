@@ -25,6 +25,9 @@ export interface AppUser {
   role: TeamRoleLevel;
   twoFactorEnabled: boolean;
   companyId: string;
+  companyName?: string;
+  /** True once the company's KYC has been approved; before that most features are blocked by the API. */
+  companyApproved?: boolean;
   lastLoginAt: string;
 }
 
@@ -49,7 +52,8 @@ export interface TeamMember {
 
 // ===================== SUBSCRIPTION =====================
 
-export type PlanId = 'free' | 'basic' | 'standard' | 'enterprise';
+/** A plan key such as 'free', 'basic', 'standard', 'enterprise'; admins can add more, so it is not a fixed union. */
+export type PlanId = string;
 
 export interface Plan {
   id: PlanId;
@@ -61,6 +65,10 @@ export interface Plan {
   overagePrice: number;
   features: string[];
   highlighted?: boolean;
+  annualPrice?: number | null;
+  customPricing?: boolean;
+  trialDays?: number;
+  currency?: string;
 }
 
 export interface Invoice {
@@ -79,6 +87,14 @@ export interface Subscription {
   trialEndsAt?: string;
   seats: number;
   usage: { used: number; included: number };
+  billingCycle?: 'month' | 'year';
+  cancelAtPeriodEnd?: boolean;
+  pendingPlanId?: string | null;
+  paymentMethod?: { brand: string; last4: string; expMonth?: number; expYear?: number } | null;
+  failedAttempts?: number;
+  nextRetryAt?: string | null;
+  nextChargeAmount?: number | null;
+  currency?: string;
 }
 
 // ===================== COMPLIANCE TEMPLATES =====================

@@ -1,6 +1,7 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { ApiError } from '../../core/http/api.service';
 import { AuthService } from '../../core/services/auth.service';
 import { DataService } from '../../core/services/data.service';
 import { AppUser, TeamRoleInfo } from '../../core/models/models';
@@ -31,13 +32,22 @@ export class ProfileComponent implements OnInit {
     return this.roles.find(r => r.level === this.user?.role)?.name || '';
   }
 
+  error = '';
+
   save() {
+    if (!this.user) return;
     this.saving = true;
-    setTimeout(() => {
-      this.saving = false;
-      this.saved.set(true);
-      if (this.user) this.auth.completeLogin(this.user);
-      setTimeout(() => this.saved.set(false), 2500);
-    }, 500);
+    this.error = '';
+    this.auth.updateProfile({ firstName: this.user.firstName, lastName: this.user.lastName, phone: this.user.phone }).subscribe({
+      next: () => {
+        this.saving = false;
+        this.saved.set(true);
+        setTimeout(() => this.saved.set(false), 2500);
+      },
+      error: (e: ApiError) => {
+        this.saving = false;
+        this.error = e.userMessage;
+      }
+    });
   }
 }

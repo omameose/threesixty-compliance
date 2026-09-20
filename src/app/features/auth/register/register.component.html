@@ -8,48 +8,84 @@
   </div>
 
   <h1 class="text-2xl font-bold text-ink-950 mb-1">Create your account</h1>
-  <p class="muted mb-7">{{ step === 1 ? 'Tell us about your business' : 'Set up your admin login' }}</p>
+  <p class="muted mb-7">{{ step === 1 ? 'Tell us about your business' : 'Set up your admin login. We will email you a code to confirm your address.' }}</p>
 
-  <form [formGroup]="form" (ngSubmit)="submit()" class="space-y-4">
+  <div *ngIf="error" class="mb-4 p-3 rounded-lg bg-red-50 text-red-700 text-sm" role="alert">
+    {{ error }}
+    <a *ngIf="existingAccount" routerLink="/auth/login" class="font-medium underline ml-1">Sign in instead</a>
+  </div>
+
+  <form [formGroup]="form" (ngSubmit)="submit()" class="space-y-4" novalidate>
     <ng-container *ngIf="step === 1">
       <div>
-        <label class="label">Company name</label>
-        <input class="input" formControlName="companyName" placeholder="e.g. PayFlux Technologies"/>
+        <label class="label" for="companyName">Company name</label>
+        <input id="companyName" class="input" formControlName="companyName" placeholder="e.g. PayFlux Technologies" autocomplete="organization"/>
+        <p class="text-xs text-red-600 mt-1" *ngIf="form.controls.companyName.touched && form.controls.companyName.invalid">Enter your company name.</p>
       </div>
       <div>
-        <label class="label">Industry</label>
-        <select class="input" formControlName="industry">
-          <option>Payment Gateway</option>
-          <option>Fintech</option>
-          <option>Commercial Bank</option>
-          <option>Insurance</option>
-          <option>Healthcare</option>
-          <option>Education</option>
-          <option>E-commerce / Marketplace</option>
-          <option>Logistics</option>
-          <option>Other</option>
+        <label class="label" for="industry">Industry</label>
+        <select id="industry" class="input" formControlName="industry">
+          <option value="" disabled>Select your industry</option>
+          <ng-container *ngIf="industries$ | async as opts">
+            <optgroup *ngFor="let s of opts.sectors" [label]="s.name">
+              <option *ngFor="let i of s.industries" [value]="i">{{ i }}</option>
+            </optgroup>
+            <option value="Other">Other</option>
+          </ng-container>
+        </select>
+        <p class="text-xs text-red-600 mt-1" *ngIf="form.controls.industry.touched && form.controls.industry.invalid">Choose the industry that fits best.</p>
+      </div>
+      <div>
+        <label class="label" for="country">Country <span class="text-ink-400 font-normal">(optional)</span></label>
+        <select id="country" class="input" formControlName="country">
+          <option value="">Select a country</option>
+          <option *ngFor="let c of countries$ | async" [value]="c.name">{{ c.name }}</option>
         </select>
       </div>
       <button type="button" class="btn-primary w-full py-3" (click)="nextStep()">Continue</button>
     </ng-container>
 
     <ng-container *ngIf="step === 2">
-      <div>
-        <label class="label">Full name</label>
-        <input class="input" formControlName="fullName" placeholder="Your full name"/>
+      <div class="grid grid-cols-2 gap-3">
+        <div>
+          <label class="label" for="firstName">First name</label>
+          <input id="firstName" class="input" formControlName="firstName" placeholder="First name" autocomplete="given-name"/>
+          <p class="text-xs text-red-600 mt-1" *ngIf="form.controls.firstName.touched && form.controls.firstName.invalid">Required.</p>
+        </div>
+        <div>
+          <label class="label" for="lastName">Last name</label>
+          <input id="lastName" class="input" formControlName="lastName" placeholder="Last name" autocomplete="family-name"/>
+          <p class="text-xs text-red-600 mt-1" *ngIf="form.controls.lastName.touched && form.controls.lastName.invalid">Required.</p>
+        </div>
       </div>
       <div>
-        <label class="label">Work email</label>
-        <input class="input" type="email" formControlName="email" placeholder="you@company.com"/>
+        <label class="label" for="email">Work email</label>
+        <input id="email" class="input" type="email" formControlName="email" placeholder="you@company.com" autocomplete="email"/>
+        <p class="text-xs text-red-600 mt-1" *ngIf="form.controls.email.touched && form.controls.email.invalid">Enter a valid email address.</p>
       </div>
       <div>
-        <label class="label">Password</label>
-        <input class="input" type="password" formControlName="password" placeholder="Minimum 8 characters"/>
+        <label class="label" for="phone">Phone <span class="text-ink-400 font-normal">(optional)</span></label>
+        <input id="phone" class="input" type="tel" formControlName="phone" placeholder="+234 801 234 5678" autocomplete="tel"/>
+      </div>
+      <div>
+        <label class="label" for="password">Password</label>
+        <input id="password" class="input" type="password" formControlName="password" placeholder="Create a strong password" autocomplete="new-password"/>
+        <ul class="mt-2 grid grid-cols-2 gap-x-3 gap-y-1 text-xs">
+          <li *ngFor="let r of rules" [class.text-brand-600]="ruleMet(r.key)" [class.text-ink-400]="!ruleMet(r.key)">
+            {{ ruleMet(r.key) ? '✓' : '○' }} {{ r.label }}
+          </li>
+        </ul>
+      </div>
+      <div>
+        <label class="label" for="confirmPassword">Confirm password</label>
+        <input id="confirmPassword" class="input" type="password" formControlName="confirmPassword" placeholder="Repeat the password" autocomplete="new-password"/>
+        <p class="text-xs text-red-600 mt-1" *ngIf="form.controls.confirmPassword.touched && form.controls.confirmPassword.errors?.['mismatch']">The passwords do not match.</p>
       </div>
       <label class="flex items-start gap-2 text-sm text-ink-600">
         <input type="checkbox" formControlName="agree" class="mt-0.5 rounded border-ink-300 text-brand-600 focus:ring-brand-500"/>
-        I agree to the <a href="#" class="text-brand-600 hover:underline mx-1">Terms of Service</a> and <a href="#" class="text-brand-600 hover:underline ml-1">Privacy Policy</a>
+        <span>I agree to the <a href="#" class="text-brand-600 hover:underline">Terms of Service</a> and <a href="#" class="text-brand-600 hover:underline">Privacy Policy</a></span>
       </label>
+      <p class="text-xs text-red-600" *ngIf="form.controls.agree.touched && form.controls.agree.invalid">Please accept the terms to continue.</p>
       <div class="flex gap-3">
         <button type="button" class="btn-secondary flex-1 py-3" (click)="step = 1">Back</button>
         <button type="submit" class="btn-primary flex-1 py-3" [disabled]="loading">
