@@ -7,6 +7,8 @@
 </div>
 
 <!-- COMPANY -->
+<div *ngIf="error()" class="mb-4 p-3 rounded-lg bg-red-50 text-red-700 text-sm max-w-3xl" role="alert">{{ error() }}</div>
+
 <div *ngIf="activeTab === 'company' && company" class="max-w-3xl space-y-5">
   <div class="card p-6">
     <h3 class="font-semibold text-ink-900 mb-1">Branding</h3>
@@ -17,11 +19,9 @@
         <app-icon *ngIf="!logoPreview" name="building" [size]="28" class="text-ink-300"></app-icon>
       </div>
       <div>
-        <label class="btn-secondary btn-sm cursor-pointer inline-flex">
-          <app-icon name="upload" [size]="14"></app-icon> Upload Logo
-          <input type="file" accept="image/*" class="hidden" (change)="onLogoSelected($event)"/>
-        </label>
-        <p class="text-xs text-ink-400 mt-2">PNG or SVG, at least 256x256px, transparent background recommended.</p>
+        <label class="label" for="logo-url">Logo address (https://...)</label>
+        <input id="logo-url" class="input" [ngModel]="company.logoUrl" (ngModelChange)="onLogoUrl($event)" maxlength="500" placeholder="https://your-site.com/logo.png"/>
+        <p class="text-xs text-ink-400 mt-2">Link to a PNG or JPG hosted on your own site, at least 256x256px.</p>
       </div>
     </div>
     <div class="mt-5">

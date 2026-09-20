@@ -13,7 +13,7 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
   const auth = inject(AuthService);
   const router = inject(Router);
   const isApi = req.url.startsWith(environment.apiBaseUrl);
-  const isAuthCall = req.url.includes('/auth/');
+  const isAuthCall = req.url.includes('/auth/') || req.url.includes('/public/'); // public data needs no token, and the approval gate would reject it for unapproved companies
   if (!isApi || isAuthCall) return next(req);
 
   const withToken = (token: string | null) => (token ? req.clone({ setHeaders: { Authorization: `Bearer ${token}` } }) : req);

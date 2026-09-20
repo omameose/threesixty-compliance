@@ -4,6 +4,8 @@ import { FormsModule } from '@angular/forms';
 import { Location } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { forkJoin } from 'rxjs';
+import { ApiError } from '../../../core/http/api.service';
+import { ComplianceApiService } from '../../../core/services/compliance-api.service';
 import { DataService } from '../../../core/services/data.service';
 import { Customer } from '../../../core/models/models';
 import { IconComponent } from '../../../shared/components/icon/icon.component';
@@ -37,18 +39,23 @@ export class CustomerDetailComponent implements OnInit {
   requestInfoNote = '';
   rejectReason = '';
   actionSuccess = signal<string | null>(null);
+  error = signal('');
+  acting = signal(false);
 
   intelligence: IntelligenceEntry[] = [];
   intelligenceLoading = true;
   runningScan = signal<ScanType | null>(null);
 
-  constructor(private data: DataService, private location: Location) {}
+  constructor(private data: DataService, private api: ComplianceApiService, private location: Location) {}
 
   ngOnInit() {
-    this.data.getCustomer(this.customerId).subscribe(c => {
-      this.customer = c;
-      this.loading = false;
-      if (c) this.loadIntelligence(c);
+    this.api.customer(this.customerId).subscribe({
+      next: c => {
+        this.customer = c;
+        this.loading = false;
+        this.loadIntelligence(c);
+      },
+      error: (e: ApiError) => { this.loading = false; this.error.set(e.userMessage); }
     });
   }
 
@@ -119,38 +126,55 @@ export class CustomerDetailComponent implements OnInit {
 
   goBack() { this.location.back(); }
 
-  approve() {
-    if (!this.customer) return;
-    this.data.updateCustomerStatus(this.customer.id, 'approved').subscribe(() => {
-      this.customer!.status = 'approved';
-      this.actionSuccess.set('Customer approved. A webhook notification has been sent to your configured endpoint.');
-      setTimeout(() => this.actionSuccess.set(null), 4000);
+  /** Runs a decision call, then reloads the customer so status, timeline and reason come from the server. */
+  private decide(call: () => import('rxjs').Observable<unknown>, success: string, after?: () => void) {
+    if (!this.customer || this.acting()) return;
+    this.acting.set(true);
+    this.error.set('');
+    call().subscribe({
+      next: () => {
+        this.acting.set(false);
+        after?.();
+        this.actionSuccess.set(success);
+        setTimeout(() => this.actionSuccess.set(null), 4000);
+        this.api.customer(this.customerId).subscribe({ next: c => this.customer = { ...c }, error: () => undefined });
+      },
+      error: (e: ApiError) => {
+        this.acting.set(false);
+        after?.();
+        this.error.set(e.userMessage);
+      }
     });
+  }
+
+  approve() {
+    this.decide(() => this.api.approveCustomer(this.customer!.id), 'Customer approved. Your webhook endpoint (if set) has been notified.');
   }
 
   confirmReject() {
-    if (!this.customer) return;
-    this.data.updateCustomerStatus(this.customer.id, 'rejected').subscribe(() => {
-      this.customer!.status = 'rejected';
-      this.rejectModalOpen.set(false);
-      this.actionSuccess.set('Customer rejected. A webhook notification has been sent to your configured endpoint.');
-      setTimeout(() => this.actionSuccess.set(null), 4000);
-    });
+    const reason = this.rejectReason.trim();
+    if (!reason) { this.error.set('Please give a reason for rejecting.'); return; }
+    this.decide(() => this.api.rejectCustomer(this.customer!.id, reason), 'Customer rejected. Your webhook endpoint (if set) has been notified.', () => this.rejectModalOpen.set(false));
   }
 
   confirmRequestInfo() {
-    if (!this.customer) return;
-    this.data.updateCustomerStatus(this.customer.id, 'more_info_required').subscribe(() => {
-      this.customer!.status = 'more_info_required';
-      this.requestInfoModalOpen.set(false);
-      this.actionSuccess.set('An email has been sent to ' + this.customer!.email + ' requesting more information.');
-      setTimeout(() => this.actionSuccess.set(null), 4000);
-    });
+    const message = this.requestInfoNote.trim();
+    if (!message) { this.error.set('Tell the customer what you need.'); return; }
+    this.decide(() => this.api.requestCustomerInfo(this.customer!.id, message), 'An email has been sent to ' + this.customer!.email + ' asking for more information.', () => this.requestInfoModalOpen.set(false));
   }
 
-  downloadAnswer(fileName?: string) {
-    if (!fileName) return;
-    // Simulated download in this demo build.
-    alert('Downloading ' + fileName + ' (simulated — connect your backend endpoint to enable real downloads).');
+  downloadAnswer(a: { fileId?: string; fileName?: string }) {
+    if (!this.customer || !a.fileId) return;
+    this.api.downloadCustomerFile(this.customer.id, a.fileId).subscribe({
+      next: blob => {
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = a.fileName || 'file';
+        link.click();
+        URL.revokeObjectURL(url);
+      },
+      error: () => this.error.set('The file could not be downloaded.')
+    });
   }
 }

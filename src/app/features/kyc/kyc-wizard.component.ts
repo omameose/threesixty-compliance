@@ -180,7 +180,7 @@ const today = () => new Date().toISOString().slice(0, 10);
                 <td>{{ d.documentTypeLabel }}</td>
                 <td>{{ d.fileName }} <span class="muted">({{ size(d.sizeBytes) }})</span>
                   <p class="text-xs text-red-600" *ngIf="d.reviewerComment">{{ d.reviewerComment }}</p></td>
-                <td><span class="badge" [ngClass]="d.status === 'ACCEPTED' ? 'badge-green' : d.status === 'REJECTED' ? 'badge-red' : 'badge-gray'">{{ label(d.status) }}</span></td>
+                <td><span class="badge" [ngClass]="d.status === 'APPROVED' ? 'badge-green' : d.status === 'REJECTED' ? 'badge-red' : 'badge-gray'">{{ label(d.status) }}</span></td>
                 <td class="text-right whitespace-nowrap">
                   <button type="button" class="text-brand-600 hover:underline text-sm mr-3" (click)="download(d)">Download</button>
                   <button type="button" *ngIf="editable()" class="text-red-600 hover:underline text-sm" (click)="removeDocument(d)">Delete</button>

@@ -3,8 +3,9 @@ import { Component, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ApiError } from '../../core/http/api.service';
 import { AuthService } from '../../core/services/auth.service';
-import { SandboxCard, SubscriptionApiService } from '../../core/services/subscription-api.service';
+import { GatewayOption, SandboxCard, SubscriptionApiService } from '../../core/services/subscription-api.service';
 import { Invoice, Plan, Subscription } from '../../core/models/models';
+import { environment } from '../../../environments/environment';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
 import { IconComponent } from '../../shared/components/icon/icon.component';
 import { ModalComponent } from '../../shared/components/modal/modal.component';
@@ -27,6 +28,11 @@ export class SubscriptionComponent implements OnInit {
   billingCycle: 'month' | 'year' = 'month';
   sandboxCard: SandboxCard = 'approved';
   useNewCard = false;
+  gateways: GatewayOption[] = [];
+  /** 'card' (saved or test card) or the key of a gateway whose own page takes the payment. */
+  payWith = 'card';
+  /** Test cards only exist outside production. */
+  readonly testCardsAvailable = !environment.production;
 
   /** True while a payment request is in flight: every button that could send another one is disabled. */
   submitting = signal(false);
@@ -42,6 +48,7 @@ export class SubscriptionComponent implements OnInit {
   }
 
   ngOnInit() {
+    this.api.getGateways().subscribe({ next: g => (this.gateways = g), error: () => (this.gateways = []) });
     this.reload();
   }
 
@@ -87,13 +94,30 @@ export class SubscriptionComponent implements OnInit {
     this.billingCycle = this.subscription?.billingCycle ?? 'month';
     this.useNewCard = !this.subscription?.paymentMethod;
     this.sandboxCard = 'approved';
+    this.payWith = this.gateways.length ? this.gateways[0].key : 'card';
     this.actionError.set('');
     this.idempotencyKey = SubscriptionApiService.newIdempotencyKey();
     this.changeModalOpen.set(true);
   }
 
+  /** Moving to a cheaper plan is scheduled for the end of the period and needs no payment now. */
+  isDowngrade(): boolean {
+    const cur = this.currentPlan();
+    if (!cur || !this.targetPlan || cur.id === 'free') return false;
+    const price = (p: Plan) => (this.billingCycle === 'year' && p.annualPrice ? p.annualPrice / 12 : p.price);
+    return price(this.targetPlan) < price(cur);
+  }
+
+  usesGateway(): boolean {
+    return this.payWith !== 'card' && !this.isDowngrade();
+  }
+
   confirmChange() {
     if (!this.targetPlan || this.submitting()) return;
+    if (this.usesGateway()) {
+      this.payOnGateway();
+      return;
+    }
     this.submitting.set(true);
     this.actionError.set('');
     const paymentToken = this.useNewCard || !this.subscription?.paymentMethod ? SubscriptionApiService.sandboxToken(this.sandboxCard) : undefined;
@@ -110,6 +134,29 @@ export class SubscriptionComponent implements OnInit {
         // A definite refusal (declined card, plan unavailable) needs a NEW key for the next attempt; a 409 or a network error
         // means the outcome may not be known yet, so the same key stays and a retry can only ever replay or complete it.
         if (e.httpStatus === 402 || e.httpStatus === 400) this.idempotencyKey = SubscriptionApiService.newIdempotencyKey();
+      }
+    });
+  }
+
+  /** Sends the customer to the gateway's own page. Nothing changes here: the plan only changes once the gateway confirms the payment. */
+  private payOnGateway() {
+    this.submitting.set(true);
+    this.actionError.set('');
+    this.api.startCheckout({ planId: this.targetPlan!.id, billingCycle: this.billingCycle, gateway: this.payWith }, this.idempotencyKey).subscribe({
+      next: c => {
+        if (c.checkoutUrl) {
+          window.location.href = c.checkoutUrl;
+        } else {
+          this.submitting.set(false);
+          this.changeModalOpen.set(false);
+          this.notice.set(c.status === 'success' ? 'That payment was already completed.' : 'That payment attempt has ended. Please start again.');
+          this.reload();
+        }
+      },
+      error: (e: ApiError) => {
+        this.submitting.set(false);
+        this.actionError.set(this.describe(e));
+        if (e.httpStatus === 400 || e.httpStatus === 402 || e.httpStatus === 503) this.idempotencyKey = SubscriptionApiService.newIdempotencyKey();
       }
     });
   }

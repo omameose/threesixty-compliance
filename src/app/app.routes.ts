@@ -75,13 +75,14 @@ export const routes: Routes = [
       { path: 'war-room', loadComponent: () => import('./features/war-room/war-room.component').then(m => m.WarRoomComponent), title: 'Executive War Room' },
       { path: 'developer-console', loadComponent: () => import('./features/developer-console/developer-console.component').then(m => m.DeveloperConsoleComponent), title: 'Developer Console' },
       { path: 'teams', loadComponent: () => import('./features/teams/teams.component').then(m => m.TeamsComponent), title: 'Teams' },
+      { path: 'subscription/pay/:reference', loadComponent: () => import('./features/subscription/payment-result.component').then(m => m.PaymentResultComponent), title: 'Payment' },
       { path: 'subscription', loadComponent: () => import('./features/subscription/subscription.component').then(m => m.SubscriptionComponent), title: 'Subscription' },
       { path: 'settings', loadComponent: () => import('./features/settings/settings.component').then(m => m.SettingsComponent), title: 'Settings' },
       { path: 'profile', loadComponent: () => import('./features/profile/profile.component').then(m => m.ProfileComponent), title: 'Profile' }
     ]
   },
   {
-    path: 'verify/:formId',
+    path: 'kyc/:linkCode',
     loadComponent: () => import('./features/kyc-portal/kyc-portal.component').then(m => m.KycPortalComponent)
   },
   { path: '**', redirectTo: '' }

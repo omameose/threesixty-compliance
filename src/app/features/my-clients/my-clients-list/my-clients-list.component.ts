@@ -3,6 +3,8 @@ import { Component, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { CdkDragDrop, DragDropModule, moveItemInArray, transferArrayItem } from '@angular/cdk/drag-drop';
+import { ApiError } from '../../../core/http/api.service';
+import { ComplianceApiService, LinkView, toForm } from '../../../core/services/compliance-api.service';
 import { DataService } from '../../../core/services/data.service';
 import { ComplianceForm, Customer, CustomerStatus } from '../../../core/models/models';
 
@@ -58,22 +60,30 @@ export class MyClientsListComponent implements OnInit {
   scanRunningFor = signal<string | null>(null);
 
   linkModalOpen = signal(false);
-  generatedLink = signal<{ complianceId: string; link: string } | null>(null);
-  newCustomerName = '';
-  newCustomerEmail = '';
+  generatedLink = signal<LinkView | null>(null);
+  linkLabel = '';
   newCustomerForm = '';
+  moveNote = '';
+  error = signal('');
+  creating = signal(false);
   copied = signal(false);
 
-  constructor(private data: DataService) {}
+  constructor(private data: DataService, private api: ComplianceApiService) {}
 
   ngOnInit() {
-    this.data.getForms().subscribe(f => { this.forms = f; this.newCustomerForm = f[0]?.id || ''; });
+    this.api.forms().subscribe({
+      next: f => { this.forms = f.map(toForm); this.newCustomerForm = this.forms.find(x => x.status === 'live')?.id || this.forms[0]?.id || ''; },
+      error: (e: ApiError) => this.error.set(e.userMessage)
+    });
     this.load();
   }
 
   load() {
     this.loading = true;
-    this.data.getCustomers().subscribe(c => { this.customers = c; this.buildBoard(); this.loading = false; });
+    this.api.customers().subscribe({
+      next: p => { this.customers = p.items; this.buildBoard(); this.loading = false; },
+      error: (e: ApiError) => { this.error.set(e.userMessage); this.loading = false; }
+    });
   }
 
   buildBoard() {
@@ -107,16 +117,19 @@ export class MyClientsListComponent implements OnInit {
   }
 
   generateLink() {
-    if (!this.newCustomerName.trim() || !this.newCustomerForm) return;
-    this.data.generateComplianceLink(this.newCustomerName, this.newCustomerForm).subscribe(res => {
-      this.generatedLink.set(res);
+    if (!this.newCustomerForm) return;
+    this.creating.set(true);
+    this.error.set('');
+    this.api.createLink(this.newCustomerForm, { label: this.linkLabel.trim() || undefined }).subscribe({
+      next: l => { this.creating.set(false); this.generatedLink.set(l); },
+      error: (e: ApiError) => { this.creating.set(false); this.error.set(e.userMessage); }
     });
   }
 
   copyLink() {
     const link = this.generatedLink();
     if (!link) return;
-    navigator.clipboard?.writeText(link.link).catch(() => {});
+    navigator.clipboard?.writeText(link.url).catch(() => {});
     this.copied.set(true);
     setTimeout(() => this.copied.set(false), 2000);
   }
@@ -124,8 +137,7 @@ export class MyClientsListComponent implements OnInit {
   closeLinkModal() {
     this.linkModalOpen.set(false);
     this.generatedLink.set(null);
-    this.newCustomerName = '';
-    this.newCustomerEmail = '';
+    this.linkLabel = '';
   }
 
   // ===== Board view =====
@@ -188,14 +200,38 @@ export class MyClientsListComponent implements OnInit {
     });
   }
 
+  /** Only these three are decisions a person can make; the earlier stages are set by the customer's own progress. */
+  needsNote(status: CustomerStatus) {
+    return status === 'rejected' || status === 'more_info_required';
+  }
+
   confirmMove() {
     const pm = this.pendingMove();
     if (!pm) return;
-    pm.customer.status = pm.toStatus;
-    this.data.updateCustomerStatus(pm.customer.id, pm.toStatus).subscribe(() => {
-      this.commitBoardOrder();
-      this.pendingMove.set(null);
-      this.flash(`${pm.customer.fullName} moved to ${pm.toLabel}.`);
+    if (!['approved', 'rejected', 'more_info_required'].includes(pm.toStatus)) {
+      this.cancelMove();
+      this.error.set('Customers can only be moved to Approved, Rejected or More Info Required. The other stages follow the customer\'s own progress.');
+      return;
+    }
+    const note = this.moveNote.trim();
+    if (this.needsNote(pm.toStatus) && !note) {
+      this.error.set(pm.toStatus === 'rejected' ? 'Please give a reason for rejecting.' : 'Tell the customer what you need.');
+      return;
+    }
+    this.error.set('');
+    this.api.moveCustomer(pm.customer.id, pm.toStatus, note).subscribe({
+      next: () => {
+        pm.customer.status = pm.toStatus;
+        this.moveNote = '';
+        this.pendingMove.set(null);
+        this.flash(`${pm.customer.fullName} moved to ${pm.toLabel}.`);
+        this.load();
+      },
+      error: (e: ApiError) => {
+        this.moveNote = '';
+        this.cancelMove();
+        this.error.set(e.userMessage);
+      }
     });
   }
 
@@ -203,13 +239,13 @@ export class MyClientsListComponent implements OnInit {
     const pm = this.pendingMove();
     if (!pm) return;
     transferArrayItem(pm.containerData, pm.previousContainerData, pm.currentIndex, pm.previousIndex);
+    this.moveNote = '';
     this.pendingMove.set(null);
   }
 
   private commitBoardOrder() {
     const flat = this.boardColumns.flatMap(c => this.board[c.status]);
     this.customers = flat;
-    this.data.reorderCustomers(flat);
   }
 
   private flash(msg: string) {

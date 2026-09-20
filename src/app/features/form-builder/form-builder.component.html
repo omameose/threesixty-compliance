@@ -7,7 +7,7 @@
       <p class="text-xs text-ink-400 mt-0.5">{{ sections().length }} sections &middot; {{ totalQuestions() }} questions</p>
     </div>
     <div class="flex items-center gap-3 flex-wrap">
-      <select class="input !w-auto" [(ngModel)]="formType">
+      <select class="input !w-auto" [(ngModel)]="formType" [disabled]="!!currentId" title="The type is fixed once the form is saved">
         <option value="KYC">KYC</option>
         <option value="KYB">KYB</option>
         <option value="AML">AML</option>
@@ -25,6 +25,9 @@
       </button>
     </div>
   </div>
+
+  <div *ngIf="error" class="mb-4 p-3 rounded-lg bg-red-50 text-red-700 text-sm" role="alert">{{ error }}</div>
+  <p *ngIf="loading" class="muted mb-4">Loading your form...</p>
 
   <div class="fixed bottom-6 right-6 z-40 bg-ink-900 text-white text-sm px-4 py-2.5 rounded-lg shadow-lg fade-in" *ngIf="saved">
     Form saved successfully.

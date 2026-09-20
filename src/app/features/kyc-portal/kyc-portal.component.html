@@ -1,144 +1,200 @@
-<div class="min-h-screen bg-ink-50/60 flex flex-col">
-  <header class="h-16 bg-white border-b border-ink-100 flex items-center px-6">
-    <div class="flex items-center gap-2 font-bold" *ngIf="company">
-      <span class="w-8 h-8 rounded-lg flex items-center justify-center text-white overflow-hidden" [style.background]="company.brandColor">
-        <img *ngIf="company.logoUrl" [src]="company.logoUrl" class="w-full h-full object-cover"/>
-        <app-icon *ngIf="!company.logoUrl" name="building" [size]="16"></app-icon>
+<div class="min-h-screen flex flex-col" [style.background]="brand.backgroundColor || '#f7f8f9'" [style.color]="brand.textColor || null"
+     [style.font-family]="brand.fontFamily || null">
+  <header class="h-16 bg-white border-b border-ink-100 flex items-center px-6" *ngIf="form">
+    <div class="flex items-center gap-2 font-bold">
+      <span class="w-8 h-8 rounded-lg flex items-center justify-center text-white overflow-hidden" [style.background]="color">
+        <img *ngIf="brand.logoUrl" [src]="brand.logoUrl" alt="" class="w-full h-full object-cover"/>
+        <app-icon *ngIf="!brand.logoUrl" name="building" [size]="16"></app-icon>
       </span>
-      {{ company.name }}
+      {{ brand.displayName || form.companyName }}
     </div>
     <span class="ml-auto text-xs text-ink-400 flex items-center gap-1">
-      <app-icon name="shield" [size]="13"></app-icon> Secured by 360Compliance
+      <app-icon name="shield" [size]="13"></app-icon> Secure verification
     </span>
   </header>
 
   <main class="flex-1 flex items-start justify-center px-4 py-10">
-    <div class="w-full max-w-xl" *ngIf="!loading">
+    <div class="w-full max-w-xl">
+      <p *ngIf="loading" class="text-ink-400 text-sm text-center">Loading verification form...</p>
 
-      <!-- AUTH STEP -->
-      <div *ngIf="step() === 'auth'" class="card p-8 fade-in">
-        <div class="text-center mb-6">
-          <div class="w-14 h-14 rounded-2xl mx-auto mb-3 flex items-center justify-center text-white overflow-hidden" [style.background]="company?.brandColor">
-            <img *ngIf="company?.logoUrl" [src]="company?.logoUrl" class="w-full h-full object-cover"/>
-            <app-icon *ngIf="!company?.logoUrl" name="building" [size]="26"></app-icon>
-          </div>
-          <h1 class="text-xl font-bold text-ink-950">{{ form?.name }}</h1>
-          <p class="muted mt-1">{{ company?.name }} requires you to complete identity verification.</p>
-        </div>
-
-        <div class="space-y-4">
-          <div>
-            <label class="label">Compliance ID</label>
-            <input class="input font-mono" [(ngModel)]="complianceId"/>
-          </div>
-          <div>
-            <label class="label">Email Address</label>
-            <input class="input" type="email" [(ngModel)]="email" placeholder="you@example.com"/>
-          </div>
-          <div>
-            <label class="label">Password</label>
-            <input class="input" type="password" [(ngModel)]="password" placeholder="Sent to your email"/>
-          </div>
-          <button class="btn-primary w-full py-3" [disabled]="authenticating" (click)="startVerification()">
-            {{ authenticating ? 'Verifying...' : 'Continue' }}
-          </button>
-        </div>
-        <p class="text-xs text-ink-400 text-center mt-5">Don't have a password? Check your email for the invitation from {{ company?.name }}, or contact {{ company?.supportEmail }}.</p>
+      <div *ngIf="loadError" class="card p-8 text-center" role="alert">
+        <h1 class="text-lg font-bold text-ink-950 mb-1">This link cannot be used</h1>
+        <p class="muted">{{ loadError }}</p>
       </div>
 
-      <!-- FORM STEP -->
-      <div *ngIf="step() === 'form' && form" class="fade-in">
-        <div class="mb-5">
-          <div class="flex items-center justify-between text-sm mb-2">
-            <span class="font-medium text-ink-700">Section {{ sectionIndex() + 1 }} of {{ form.sections.length }}</span>
-            <span class="text-ink-400">{{ progressPercent() }}% complete</span>
+      <ng-container *ngIf="form">
+        <div *ngIf="error()" class="mb-4 p-3 rounded-lg bg-red-50 text-red-700 text-sm" role="alert">{{ error() }}</div>
+        <div *ngIf="notice()" class="mb-4 p-3 rounded-lg bg-brand-50 text-brand-800 text-sm" role="status">{{ notice() }}</div>
+
+        <!-- START -->
+        <div *ngIf="stage() === 'start'" class="card p-8 fade-in">
+          <div class="text-center mb-6">
+            <h1 class="text-xl font-bold text-ink-950">{{ brand.welcomeTitle || form.name }}</h1>
+            <p class="muted mt-1 whitespace-pre-line">{{ brand.welcomeMessage || (form.companyName + ' asks you to complete this verification.') }}</p>
           </div>
-          <div class="w-full h-2 bg-ink-200 rounded-full overflow-hidden">
-            <div class="h-full rounded-full transition-all" [style.width.%]="progressPercent()" [style.background]="company?.brandColor || '#128a4d'"></div>
+          <div class="space-y-4">
+            <div>
+              <label class="label" for="p-name">Full name</label>
+              <input id="p-name" class="input" [(ngModel)]="fullName" autocomplete="name" maxlength="200"/>
+            </div>
+            <div>
+              <label class="label" for="p-email">Email address</label>
+              <input id="p-email" class="input" type="email" [(ngModel)]="email" autocomplete="email" placeholder="you@example.com"/>
+            </div>
+            <div>
+              <label class="label" for="p-phone">Phone (optional)</label>
+              <input id="p-phone" class="input" type="tel" [(ngModel)]="phone" autocomplete="tel" maxlength="32"/>
+            </div>
+            <div>
+              <label class="label" for="p-country">Country (optional)</label>
+              <select id="p-country" class="input" [(ngModel)]="country">
+                <option value="">Select...</option>
+                <option *ngFor="let c of countries" [value]="c">{{ c }}</option>
+              </select>
+            </div>
+            <p class="text-xs text-ink-400" *ngIf="form.settings.consentText">{{ form.settings.consentText }}</p>
+            <button class="btn-primary w-full py-3" [style.background]="color" [disabled]="busy()" (click)="start()">
+              {{ busy() ? 'Please wait...' : 'Continue' }}
+            </button>
           </div>
         </div>
 
-        <div class="card p-8" *ngIf="currentSection() as section">
-          <h2 class="text-lg font-bold text-ink-950 mb-1">{{ section.title }}</h2>
-          <p class="muted mb-6" *ngIf="section.description">{{ section.description }}</p>
+        <!-- EMAIL CODE -->
+        <div *ngIf="stage() === 'otp'" class="card p-8 fade-in">
+          <h1 class="text-xl font-bold text-ink-950 mb-1">Check your email</h1>
+          <p class="muted mb-5">Enter the code we sent to <strong>{{ email }}</strong>.</p>
+          <input id="p-otp" class="input text-center tracking-widest text-lg mb-4" inputmode="numeric" maxlength="10" [(ngModel)]="otp" autocomplete="one-time-code"/>
+          <button class="btn-primary w-full py-3" [style.background]="color" [disabled]="busy()" (click)="verifyOtp()">
+            {{ busy() ? 'Verifying...' : 'Verify and continue' }}
+          </button>
+          <p class="text-center text-sm mt-4"><button class="text-ink-500 hover:underline" (click)="stage.set('start'); error.set('')">Use a different email</button></p>
+        </div>
 
-          <div class="space-y-5">
-            <div *ngFor="let q of section.questions">
-              <label class="label">{{ q.label }} <span class="text-red-500" *ngIf="q.required">*</span></label>
-              <p class="text-xs text-ink-400 mb-1.5" *ngIf="q.helpText">{{ q.helpText }}</p>
-
-              <input *ngIf="['short_text','email','phone','number'].includes(q.type)" class="input" [type]="q.type === 'number' ? 'number' : 'text'" [(ngModel)]="answers[q.id]" [placeholder]="q.placeholder || ''"/>
-              <input *ngIf="q.type === 'date'" class="input" type="date" [(ngModel)]="answers[q.id]"/>
-              <textarea *ngIf="q.type === 'long_text'" class="input" rows="3" [(ngModel)]="answers[q.id]" [placeholder]="q.placeholder || ''"></textarea>
-              <input *ngIf="q.type === 'address'" class="input" [(ngModel)]="answers[q.id]" placeholder="Street, city, state, postal code"/>
-
-              <select *ngIf="q.type === 'dropdown'" class="input" [(ngModel)]="answers[q.id]">
-                <option value="" disabled selected>Select an option</option>
-                <option *ngFor="let o of q.options" [value]="o.label">{{ o.label }}</option>
-              </select>
-
-              <select *ngIf="q.type === 'country'" class="input" [(ngModel)]="answers[q.id]">
-                <option value="" disabled selected>Select your country</option>
-                <option>Nigeria</option><option>Ghana</option><option>Kenya</option><option>South Africa</option>
-                <option>United Kingdom</option><option>United States</option><option>United Arab Emirates</option>
-              </select>
-
-              <div *ngIf="q.type === 'radio'" class="flex gap-5 flex-wrap">
-                <label class="flex items-center gap-2 text-sm text-ink-700" *ngFor="let o of q.options">
-                  <input type="radio" [name]="q.id" [value]="o.label" [(ngModel)]="answers[q.id]"/> {{ o.label }}
-                </label>
-              </div>
-
-              <div *ngIf="q.type === 'checkbox'" class="flex gap-5 flex-wrap">
-                <label class="flex items-center gap-2 text-sm text-ink-700" *ngFor="let o of q.options">
-                  <input type="checkbox"/> {{ o.label }}
-                </label>
-              </div>
-
-              <div *ngIf="q.type === 'file_upload' || q.type === 'id_document'">
-                <label class="border-2 border-dashed border-ink-200 rounded-lg p-5 text-center text-ink-400 hover:border-brand-400 transition cursor-pointer flex flex-col items-center gap-1 block">
-                  <app-icon name="upload" [size]="20"></app-icon>
-                  <span class="text-sm">{{ fileNames[q.id] || 'Click to upload (' + (q.acceptedFileTypes || 'any file') + ')' }}</span>
-                  <input type="file" class="hidden" (change)="onFileChange($event, q.id)"/>
-                </label>
-              </div>
-
-              <div *ngIf="q.type === 'signature'" class="border-2 border-dashed border-ink-200 rounded-lg h-24 flex items-center justify-center text-ink-400 text-sm">
-                Sign here
-              </div>
+        <!-- FORM -->
+        <div *ngIf="stage() === 'form'" class="fade-in">
+          <div class="mb-5" *ngIf="brand.showProgressBar !== false">
+            <div class="flex items-center justify-between text-sm mb-2">
+              <span class="font-medium text-ink-700">Section {{ sectionIndex() + 1 }} of {{ visibleSections().length }}</span>
+              <span class="text-ink-400">{{ progress() }}%</span>
+            </div>
+            <div class="w-full h-2 bg-ink-200 rounded-full overflow-hidden">
+              <div class="h-full rounded-full transition-all" [style.width.%]="progress()" [style.background]="color"></div>
             </div>
           </div>
 
-          <div class="flex justify-between mt-8">
-            <button class="btn-secondary" [disabled]="sectionIndex() === 0" (click)="back()">
-              <app-icon name="arrow-left" [size]="15"></app-icon> Back
-            </button>
-            <button class="btn-primary" [disabled]="submitting" (click)="next()">
-              <span *ngIf="!isLastSection()">Continue</span>
-              <span *ngIf="isLastSection()">{{ submitting ? 'Submitting...' : 'Submit for Review' }}</span>
-              <app-icon name="arrow-right" [size]="15" *ngIf="!isLastSection()"></app-icon>
-            </button>
+          <div *ngIf="submission?.moreInfo as mi" class="mb-4 p-4 rounded-lg bg-amber-50 border border-amber-200 text-amber-900 text-sm">
+            <p class="font-semibold">{{ form.companyName }} needs a little more from you.</p>
+            <p class="whitespace-pre-line">{{ mi.message }}</p>
+          </div>
+
+          <div class="card p-8" *ngIf="currentSection() as section">
+            <h2 class="text-lg font-bold text-ink-950 mb-1">{{ section.title }}</h2>
+            <p class="muted mb-6" *ngIf="section.description">{{ section.description }}</p>
+
+            <div class="space-y-5">
+              <ng-container *ngFor="let q of section.questions">
+                <div *ngIf="visible(q)">
+                  <label class="label" [attr.for]="'q-' + q.id">{{ q.label }} <span class="text-red-500" *ngIf="q.required">*</span></label>
+                  <p class="text-xs text-ink-400 mb-1.5" *ngIf="q.helpText">{{ q.helpText }}</p>
+
+                  <ng-container [ngSwitch]="q.type">
+                    <textarea *ngSwitchCase="'long_text'" [id]="'q-' + q.id" class="input" rows="3" [ngModel]="answers[q.id]" (ngModelChange)="set(q, $event)" [placeholder]="q.placeholder || ''"></textarea>
+                    <input *ngSwitchCase="'date'" [id]="'q-' + q.id" class="input" type="date" [ngModel]="answers[q.id]" (ngModelChange)="set(q, $event)"/>
+                    <input *ngSwitchCase="'number'" [id]="'q-' + q.id" class="input" type="number" [ngModel]="answers[q.id]" (ngModelChange)="set(q, $event === null ? '' : '' + $event)" [placeholder]="q.placeholder || ''"/>
+                    <input *ngSwitchCase="'email'" [id]="'q-' + q.id" class="input" type="email" [ngModel]="answers[q.id]" (ngModelChange)="set(q, $event)" [placeholder]="q.placeholder || ''"/>
+                    <input *ngSwitchCase="'phone'" [id]="'q-' + q.id" class="input" type="tel" [ngModel]="answers[q.id]" (ngModelChange)="set(q, $event)" [placeholder]="q.placeholder || ''"/>
+
+                    <select *ngSwitchCase="'dropdown'" [id]="'q-' + q.id" class="input" [ngModel]="answers[q.id] ?? ''" (ngModelChange)="set(q, $event)">
+                      <option value="">Select an option</option>
+                      <option *ngFor="let o of q.options" [value]="o.label">{{ o.label }}</option>
+                    </select>
+
+                    <select *ngSwitchCase="'country'" [id]="'q-' + q.id" class="input" [ngModel]="answers[q.id] ?? ''" (ngModelChange)="set(q, $event)">
+                      <option value="">Select a country</option>
+                      <option *ngFor="let c of countries" [value]="c">{{ c }}</option>
+                    </select>
+
+                    <div *ngSwitchCase="'radio'" class="flex gap-5 flex-wrap">
+                      <label class="flex items-center gap-2 text-sm" *ngFor="let o of q.options">
+                        <input type="radio" [name]="q.id" [value]="o.label" [checked]="answers[q.id] === o.label" (change)="set(q, o.label)"/> {{ o.label }}
+                      </label>
+                    </div>
+
+                    <div *ngSwitchCase="'checkbox'" class="flex gap-5 flex-wrap">
+                      <label class="flex items-center gap-2 text-sm" *ngFor="let o of q.options">
+                        <input type="checkbox" [checked]="isChecked(q, o.label)" (change)="toggle(q, o.label, $any($event.target).checked)"/> {{ o.label }}
+                      </label>
+                    </div>
+
+                    <div *ngSwitchCase="'file_upload'">
+                      <ul class="mb-2 space-y-1" *ngIf="filesFor(q).length">
+                        <li *ngFor="let f of filesFor(q)" class="flex items-center justify-between text-sm bg-ink-50 rounded-lg px-3 py-2">
+                          <span class="truncate">{{ f.fileName }}</span>
+                          <button type="button" class="text-red-600 hover:underline shrink-0 ml-3" (click)="removeFile(f)">Remove</button>
+                        </li>
+                      </ul>
+                      <label class="border-2 border-dashed border-ink-200 rounded-lg p-5 text-center text-ink-400 hover:border-brand-400 transition cursor-pointer flex flex-col items-center gap-1">
+                        <app-icon name="upload" [size]="20"></app-icon>
+                        <span class="text-sm">Click to upload ({{ q.acceptedFileTypes || 'any file' }}{{ q.maxFileSizeMb ? ', up to ' + q.maxFileSizeMb + ' MB' : '' }})</span>
+                        <input type="file" class="hidden" [id]="'q-' + q.id" [attr.accept]="q.acceptedFileTypes" (change)="onFile($event, q)"/>
+                      </label>
+                    </div>
+
+                    <div *ngSwitchCase="'signature'">
+                      <input [id]="'q-' + q.id" class="input" [ngModel]="answers[q.id]" (ngModelChange)="set(q, $event)" placeholder="Type your full name to sign"/>
+                    </div>
+
+                    <input *ngSwitchDefault [id]="'q-' + q.id" class="input" type="text" [ngModel]="answers[q.id]" (ngModelChange)="set(q, $event)" [placeholder]="q.placeholder || ''"/>
+                  </ng-container>
+
+                  <div *ngIf="q.verification" class="mt-2">
+                    <button type="button" class="btn-secondary btn-sm" [disabled]="busy() || !answers[q.id]" (click)="verifyId(q)">Check this {{ q.verification.type }}</button>
+                    <span class="text-xs text-ink-500 ml-2" *ngIf="idResults[q.id]">{{ idResults[q.id] }}</span>
+                  </div>
+                  <p class="text-xs text-red-600 mt-1" role="alert" *ngIf="fieldErrors[q.id]">{{ fieldErrors[q.id] }}</p>
+                </div>
+              </ng-container>
+            </div>
+
+            <div class="flex justify-between mt-8">
+              <button class="btn-secondary" [disabled]="sectionIndex() === 0 || busy()" (click)="back()">
+                <app-icon name="arrow-left" [size]="15"></app-icon> Back
+              </button>
+              <button class="btn-primary" [style.background]="color" [disabled]="busy()" (click)="next()">
+                <span *ngIf="!isLast()">{{ busy() ? 'Saving...' : 'Save and continue' }}</span>
+                <span *ngIf="isLast()">{{ busy() ? 'Submitting...' : 'Submit for review' }}</span>
+              </button>
+            </div>
           </div>
         </div>
-      </div>
 
-      <!-- COMPLETE STEP -->
-      <div *ngIf="step() === 'complete'" class="card p-10 text-center fade-in">
-        <div class="w-16 h-16 rounded-2xl bg-brand-50 text-brand-600 flex items-center justify-center mx-auto mb-4">
-          <app-icon name="check-circle" [size]="32"></app-icon>
+        <!-- DONE -->
+        <div *ngIf="stage() === 'complete'" class="card p-10 text-center fade-in">
+          <div class="w-16 h-16 rounded-2xl bg-brand-50 text-brand-600 flex items-center justify-center mx-auto mb-4">
+            <app-icon name="check-circle" [size]="32"></app-icon>
+          </div>
+          <h2 class="text-xl font-bold text-ink-950 mb-2">
+            {{ submission?.status === 'approved' ? 'Verification approved' : submission?.status === 'rejected' ? 'Verification not approved' : 'Verification submitted' }}
+          </h2>
+          <p class="muted max-w-sm mx-auto whitespace-pre-line">
+            {{ completionMessage || ('Thanks! Your information has been sent to ' + form.companyName + ' for review. You will get an email once a decision has been made.') }}
+          </p>
+          <p class="text-sm text-ink-600 mt-3" *ngIf="submission?.decisionReason">{{ submission?.decisionReason }}</p>
         </div>
-        <h2 class="text-xl font-bold text-ink-950 mb-2">Verification Submitted</h2>
-        <p class="muted max-w-sm mx-auto">Thanks! Your information has been submitted to {{ company?.name }} for review. You'll receive an email once a decision has been made.</p>
-        <div class="mt-6 inline-flex items-center gap-2 bg-ink-50 rounded-lg px-4 py-2 text-xs text-ink-500 font-mono">
-          Compliance ID: {{ complianceId }}
+
+        <div *ngIf="stage() === 'locked'" class="card p-10 text-center fade-in">
+          <h2 class="text-lg font-bold text-ink-950 mb-2">This verification cannot be edited</h2>
+          <p class="muted">It is already being processed by {{ form.companyName }}.</p>
         </div>
-      </div>
+      </ng-container>
     </div>
-
-    <div *ngIf="loading" class="text-ink-400 text-sm">Loading verification form...</div>
   </main>
 
-  <footer class="text-center text-xs text-ink-400 py-6">
-    &copy; 2026 360Compliance. This verification is securely processed on behalf of {{ company?.name }}.
+  <footer class="text-center text-xs text-ink-400 py-6" *ngIf="form">
+    <p *ngIf="brand.footerText">{{ brand.footerText }}</p>
+    <p>
+      <a *ngIf="form.poweredBy?.url" [href]="form.poweredBy?.url" target="_blank" rel="noopener" class="hover:underline">{{ form.poweredBy?.text }}</a>
+      <ng-container *ngIf="!form.poweredBy?.url">{{ form.poweredBy?.text || 'Powered by 360 Compliance' }}</ng-container>
+    </p>
   </footer>
 </div>

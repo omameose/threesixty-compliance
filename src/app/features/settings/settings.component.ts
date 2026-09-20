@@ -1,7 +1,8 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { DataService } from '../../core/services/data.service';
+import { ApiError } from '../../core/http/api.service';
+import { CompanyApiService } from '../../core/services/company-api.service';
 import { AuthService } from '../../core/services/auth.service';
 import { CompanyProfile } from '../../core/models/models';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
@@ -18,34 +19,40 @@ export class SettingsComponent implements OnInit {
   company?: CompanyProfile;
   saving = false;
   saved = signal(false);
-  logoPreview: string | ArrayBuffer | null = null;
+  error = signal('');
+  logoPreview: string | null = null;
 
   twoFactorEnabled = false;
   notifPrefs = { newSubmission: true, highRisk: true, weeklyDigest: true, webhookFailures: true };
 
-  constructor(private data: DataService, public auth: AuthService) {}
+  constructor(private companies: CompanyApiService, public auth: AuthService) {}
 
   ngOnInit() {
-    this.data.getCompany().subscribe(c => { this.company = { ...c }; this.logoPreview = c.logoUrl || null; });
+    this.companies.profile().subscribe({
+      next: c => { this.company = { ...c }; this.logoPreview = c.logoUrl || null; },
+      error: (e: ApiError) => this.error.set(e.userMessage)
+    });
     this.twoFactorEnabled = this.auth.currentUser()?.twoFactorEnabled || false;
   }
 
-  onLogoSelected(event: Event) {
-    const file = (event.target as HTMLInputElement).files?.[0];
-    if (!file) return;
-    const reader = new FileReader();
-    reader.onload = () => { this.logoPreview = reader.result; };
-    reader.readAsDataURL(file);
+  /** The logo is a web address: a picture pasted into the settings would be far too large to store. */
+  onLogoUrl(url: string) {
+    if (this.company) this.company.logoUrl = url.trim();
+    this.logoPreview = url.trim() || null;
   }
 
   save() {
     if (!this.company) return;
     this.saving = true;
-    this.company.logoUrl = typeof this.logoPreview === 'string' ? this.logoPreview : this.company.logoUrl;
-    this.data.updateCompany(this.company).subscribe(() => {
-      this.saving = false;
-      this.saved.set(true);
-      setTimeout(() => this.saved.set(false), 2500);
+    this.error.set('');
+    this.companies.saveProfile(this.company).subscribe({
+      next: c => {
+        this.saving = false;
+        this.company = { ...c };
+        this.saved.set(true);
+        setTimeout(() => this.saved.set(false), 2500);
+      },
+      error: (e: ApiError) => { this.saving = false; this.error.set(e.userMessage); }
     });
   }
 }

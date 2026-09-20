@@ -106,25 +106,44 @@
   </p>
 
   <div class="mb-4 p-3 rounded-lg bg-ink-50 text-sm">
-    <p class="font-medium text-ink-800 mb-1">Payment method</p>
-    <p *ngIf="subscription?.paymentMethod && !useNewCard" class="text-ink-600">
-      {{ subscription?.paymentMethod?.brand }} ending {{ subscription?.paymentMethod?.last4 }}
-      <button class="text-brand-600 underline ml-2" (click)="useNewCard = true">use another card</button>
-    </p>
-    <div *ngIf="useNewCard || !subscription?.paymentMethod">
-      <p class="text-xs text-ink-500 mb-2">Sandbox mode: no real card is charged. Real card details will be entered in the payment provider's secure form and never reach our servers.</p>
-      <select class="input" [(ngModel)]="sandboxCard" name="card">
-        <option value="approved">Test card: payment approved</option>
-        <option value="declined">Test card: payment declined</option>
-        <option value="insufficient">Test card: insufficient funds</option>
-      </select>
-    </div>
+    <p class="font-medium text-ink-800 mb-2">Payment method</p>
+    <p *ngIf="isDowngrade()" class="text-ink-600">Nothing is charged now. The lower plan starts when your current period ends.</p>
+
+    <ng-container *ngIf="!isDowngrade()">
+      <label class="flex items-center gap-2 py-1" *ngFor="let g of gateways">
+        <input type="radio" name="payWith" [value]="g.key" [(ngModel)]="payWith"/> Pay with {{ g.name }} <span class="text-xs text-ink-400">(secure page, opens in this window)</span>
+      </label>
+      <label class="flex items-center gap-2 py-1" *ngIf="testCardsAvailable || subscription?.paymentMethod">
+        <input type="radio" name="payWith" value="card" [(ngModel)]="payWith"/> {{ subscription?.paymentMethod ? 'Card on file' : 'Test card' }}
+      </label>
+      <p *ngIf="!gateways.length && !testCardsAvailable && !subscription?.paymentMethod" class="text-red-700">No payment method is available right now. Please try again later or contact support.</p>
+
+      <p *ngIf="usesGateway()" class="text-xs text-ink-500 mt-2">
+        You will pay on {{ payWith }}'s own page; your card details never reach our servers. Your plan changes as soon as the payment is confirmed.
+        <ng-container *ngIf="targetPlan?.trialDays && subscription?.planId === 'free'"> Paying this way starts the plan straight away, without the free trial.</ng-container>
+      </p>
+
+      <div *ngIf="payWith === 'card'" class="mt-2">
+        <p *ngIf="subscription?.paymentMethod && !useNewCard" class="text-ink-600">
+          {{ subscription?.paymentMethod?.brand }} ending {{ subscription?.paymentMethod?.last4 }}
+          <button class="text-brand-600 underline ml-2" *ngIf="testCardsAvailable" (click)="useNewCard = true">use another card</button>
+        </p>
+        <div *ngIf="testCardsAvailable && (useNewCard || !subscription?.paymentMethod)">
+          <p class="text-xs text-ink-500 mb-2">Sandbox mode: no real card is charged.</p>
+          <select class="input" [(ngModel)]="sandboxCard" name="card">
+            <option value="approved">Test card: payment approved</option>
+            <option value="declined">Test card: payment declined</option>
+            <option value="insufficient">Test card: insufficient funds</option>
+          </select>
+        </div>
+      </div>
+    </ng-container>
   </div>
 
   <div *ngIf="actionError()" class="p-3 rounded-lg bg-red-50 text-red-700 text-sm" role="alert">{{ actionError() }}</div>
   <div modal-footer class="flex gap-3 w-full sm:w-auto">
     <button class="btn-secondary flex-1" (click)="changeModalOpen.set(false)" [disabled]="submitting()">Cancel</button>
-    <button class="btn-primary flex-1" (click)="confirmChange()" [disabled]="submitting()">{{ submitting() ? 'Processing...' : 'Confirm Switch' }}</button>
+    <button class="btn-primary flex-1" (click)="confirmChange()" [disabled]="submitting()">{{ submitting() ? (usesGateway() ? 'Opening payment page...' : 'Processing...') : (usesGateway() ? 'Continue to payment' : 'Confirm Switch') }}</button>
   </div>
 </app-modal>
 

@@ -2,7 +2,8 @@ import { CommonModule } from '@angular/common';
 import { Component, Input, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
-import { DataService } from '../../../core/services/data.service';
+import { ApiError } from '../../../core/http/api.service';
+import { ComplianceApiService, LinkView, toForm } from '../../../core/services/compliance-api.service';
 import { ComplianceForm, Customer } from '../../../core/models/models';
 import { PageHeaderComponent } from '../../../shared/components/page-header/page-header.component';
 import { IconComponent } from '../../../shared/components/icon/icon.component';
@@ -24,12 +25,14 @@ export class MyComplianceDetailComponent implements OnInit {
   statusFilter = 'all';
   query = '';
   linkModalOpen = signal(false);
-  generatedLink = signal<{ complianceId: string; link: string } | null>(null);
-  newCustomerName = '';
-  newCustomerEmail = '';
+  generatedLink = signal<LinkView | null>(null);
+  links: LinkView[] = [];
+  linkLabel = '';
+  error = signal('');
+  creating = signal(false);
   copied = signal(false);
 
-  constructor(private data: DataService) {}
+  constructor(private api: ComplianceApiService) {}
 
   ngOnInit() {
     this.load();
@@ -37,8 +40,14 @@ export class MyComplianceDetailComponent implements OnInit {
 
   load() {
     this.loading = true;
-    this.data.getForm(this.formId).subscribe(f => this.form = f);
-    this.data.getCustomersByForm(this.formId).subscribe(c => { this.customers = c; this.loading = false; });
+    this.api.form(this.formId).subscribe({
+      next: f => { this.form = { ...toForm(f.summary), sections: f.sections ?? [] }; this.links = f.links ?? []; },
+      error: (e: ApiError) => { this.error.set(e.userMessage); this.loading = false; }
+    });
+    this.api.customers({ formId: this.formId }).subscribe({
+      next: p => { this.customers = p.items; this.loading = false; },
+      error: (e: ApiError) => { this.error.set(e.userMessage); this.loading = false; }
+    });
   }
 
   filtered() {
@@ -60,17 +69,27 @@ export class MyComplianceDetailComponent implements OnInit {
     }[s];
   }
 
+  /** One link serves any number of customers: each starts on their own by giving a name and email and confirming a code. */
   generateLink() {
-    if (!this.newCustomerName.trim()) return;
-    this.data.generateComplianceLink(this.newCustomerName, this.formId).subscribe(res => {
-      this.generatedLink.set(res);
+    this.creating.set(true);
+    this.error.set('');
+    this.api.createLink(this.formId, { label: this.linkLabel.trim() || undefined }).subscribe({
+      next: l => { this.creating.set(false); this.generatedLink.set(l); this.links = [l, ...this.links]; },
+      error: (e: ApiError) => { this.creating.set(false); this.error.set(e.userMessage); }
+    });
+  }
+
+  toggleLink(l: LinkView) {
+    this.api.updateLink(this.formId, l.linkCode, { enabled: !l.enabled }).subscribe({
+      next: u => this.links = this.links.map(x => x.linkCode === u.linkCode ? u : x),
+      error: (e: ApiError) => this.error.set(e.userMessage)
     });
   }
 
   copyLink() {
     const link = this.generatedLink();
     if (!link) return;
-    navigator.clipboard?.writeText(link.link).catch(() => {});
+    navigator.clipboard?.writeText(link.url).catch(() => {});
     this.copied.set(true);
     setTimeout(() => this.copied.set(false), 2000);
   }
@@ -78,7 +97,6 @@ export class MyComplianceDetailComponent implements OnInit {
   closeLinkModal() {
     this.linkModalOpen.set(false);
     this.generatedLink.set(null);
-    this.newCustomerName = '';
-    this.newCustomerEmail = '';
+    this.linkLabel = '';
   }
 }

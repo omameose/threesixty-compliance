@@ -3,6 +3,9 @@
   <button class="btn-primary" (click)="inviteModalOpen.set(true)"><app-icon name="plus" [size]="16"></app-icon> Invite Member</button>
 </app-page-header>
 
+<div *ngIf="error()" class="mb-4 p-3 rounded-lg bg-red-50 text-red-700 text-sm" role="alert">{{ error() }}</div>
+<div *ngIf="notice()" class="mb-4 p-3 rounded-lg bg-brand-50 text-brand-800 text-sm" role="status">{{ notice() }}</div>
+
 <div class="card overflow-x-auto" *ngIf="!loading">
   <table class="table">
     <thead><tr><th>Member</th><th>Role</th><th>Status</th><th>Invited</th><th>Last Active</th><th></th></tr></thead>
@@ -18,7 +21,7 @@
           </div>
         </td>
         <td>
-          <select class="input !w-auto !py-1.5 !text-xs" [ngModel]="m.role" (ngModelChange)="updateRole(m, $event)">
+          <select class="input !w-auto !py-1.5 !text-xs" [ngModel]="m.role" [disabled]="m.owner" (ngModelChange)="updateRole(m, $event)">
             <option *ngFor="let r of roles" [value]="r.level">L{{ r.level }} — {{ r.name }}</option>
           </select>
         </td>
@@ -30,9 +33,14 @@
         <td class="text-sm text-ink-500">{{ m.invitedAt }}</td>
         <td class="text-sm text-ink-500">{{ m.lastActive }}</td>
         <td>
-          <button class="p-2 text-ink-400 hover:text-red-500" (click)="removeTarget.set(m)">
-            <app-icon name="trash" [size]="16"></app-icon>
-          </button>
+          <div class="flex items-center justify-end gap-1" *ngIf="!m.owner">
+            <button *ngIf="m.status === 'invited'" class="btn-secondary btn-sm" (click)="resend(m)">Resend invite</button>
+            <button *ngIf="m.status !== 'invited'" class="btn-secondary btn-sm" (click)="toggleSuspend(m)">{{ m.status === 'active' ? 'Suspend' : 'Reactivate' }}</button>
+            <button class="p-2 text-ink-400 hover:text-red-500" title="Remove" (click)="removeTarget.set(m)">
+              <app-icon name="trash" [size]="16"></app-icon>
+            </button>
+          </div>
+          <span *ngIf="m.owner" class="text-xs text-ink-400">Owner</span>
         </td>
       </tr>
     </tbody>
@@ -44,6 +52,16 @@
     <div>
       <label class="label">Email address</label>
       <input class="input" type="email" [(ngModel)]="inviteEmail" placeholder="colleague@company.com"/>
+    </div>
+    <div class="grid grid-cols-2 gap-3">
+      <div>
+        <label class="label">First name (optional)</label>
+        <input class="input" [(ngModel)]="inviteFirstName" maxlength="100"/>
+      </div>
+      <div>
+        <label class="label">Last name (optional)</label>
+        <input class="input" [(ngModel)]="inviteLastName" maxlength="100"/>
+      </div>
     </div>
     <div>
       <label class="label">Access Level</label>
@@ -71,5 +89,15 @@
   </div>
   <div modal-footer class="w-full sm:w-auto">
     <button class="btn-primary w-full sm:w-auto" (click)="rolesLegendOpen.set(false)">Got it</button>
+  </div>
+</app-modal>
+
+<app-modal [open]="!!removeTarget()" title="Remove this member?" (close)="removeTarget.set(null)">
+  <p class="text-sm text-ink-600" *ngIf="removeTarget() as t">
+    <strong>{{ t.name }}</strong> ({{ t.email }}) will lose access to your workspace immediately.
+  </p>
+  <div modal-footer class="flex gap-3 w-full sm:w-auto">
+    <button class="btn-secondary flex-1" (click)="removeTarget.set(null)">Cancel</button>
+    <button class="btn-danger flex-1" (click)="confirmRemove()">Remove member</button>
   </div>
 </app-modal>

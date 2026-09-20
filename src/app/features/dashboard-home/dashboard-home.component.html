@@ -1,3 +1,4 @@
+<div *ngIf="statsError" class="mb-4 p-3 rounded-lg bg-red-50 text-red-700 text-sm" role="alert">{{ statsError }}</div>
 <app-page-header title="Dashboard" subtitle="Overview of your compliance program and customer verifications.">
   <a routerLink="/app/my-clients" class="btn-secondary"><app-icon name="clients" [size]="16"></app-icon> View Clients</a>
   <a routerLink="/app/form-builder" class="btn-primary"><app-icon name="plus" [size]="16"></app-icon> New Compliance Form</a>
@@ -80,7 +81,7 @@
   <div class="flex items-center justify-between mt-10 mb-4">
     <div>
       <h2 class="text-lg font-bold text-ink-900">Compliance &amp; Risk Intelligence</h2>
-      <p class="muted">Live signal from screening, detection and investigation across the platform.</p>
+      <p class="muted">Screening, detection and investigation signals. <span class="badge-yellow ml-1">Sample data</span> These tiles are not connected to your account yet.</p>
     </div>
     <a routerLink="/app/war-room" class="btn-secondary btn-sm"><app-icon name="activity" [size]="14"></app-icon> Executive War Room</a>
   </div>

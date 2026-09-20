@@ -86,7 +86,7 @@ export class ApiService {
       if (v !== undefined && v !== null && v !== '') params = params.set(k, String(v));
     }
     return this.http
-      .post<ApiEnvelope<T>>(this.base + path, form, { params })
+      .post<ApiEnvelope<T>>(this.base + path, form, { params, headers: new HttpHeaders(options.headers ?? {}) })
       .pipe(
         map(r => r.data as T),
         catchError(err => throwError(() => this.toApiError(err)))

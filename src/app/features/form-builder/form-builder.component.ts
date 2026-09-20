@@ -2,12 +2,11 @@ import { CommonModule } from '@angular/common';
 import { Component, Input, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
-import { DataService } from '../../core/services/data.service';
+import { ApiError } from '../../core/http/api.service';
+import { ComplianceApiService } from '../../core/services/compliance-api.service';
 import { ComplianceForm, FormQuestion, FormSection, QuestionOption, QuestionType } from '../../core/models/models';
 import { IconComponent } from '../../shared/components/icon/icon.component';
 import { ModalComponent } from '../../shared/components/modal/modal.component';
-import { MOCK_FORMS } from '../../core/mock/forms.mock';
-import { findTemplate } from '../../core/mock/sectors.mock';
 
 interface QuestionTypeMeta { type: QuestionType; label: string; icon: string; }
 
@@ -50,38 +49,40 @@ export class FormBuilderComponent implements OnInit {
     { type: 'signature', label: 'Signature', icon: 'edit' }
   ];
 
-  constructor(private data: DataService, private route: ActivatedRoute, private router: Router) {}
+  error = '';
+  loading = false;
+  /** Set once the form exists on the server; a brand-new form only gets an id on its first save. */
+  currentId?: string;
+
+  constructor(private api: ComplianceApiService, private route: ActivatedRoute, private router: Router) {}
 
   ngOnInit() {
     if (this.formId) {
-      this.data.getForm(this.formId).subscribe(form => {
-        if (form) {
-          this.formName = form.name;
-          this.formType = form.type;
-          this.status = form.status;
-          this.sections.set(JSON.parse(JSON.stringify(form.sections)));
-        }
+      this.currentId = this.formId;
+      this.loading = true;
+      this.api.form(this.formId).subscribe({
+        next: f => {
+          this.loading = false;
+          this.formName = f.summary.name;
+          this.formType = f.summary.type;
+          this.status = f.summary.status;
+          this.sections.set(f.sections?.length ? JSON.parse(JSON.stringify(f.sections)) : [{ id: genId('sec'), title: 'Section 1', description: '', questions: [] }]);
+        },
+        error: (e: ApiError) => { this.loading = false; this.error = e.userMessage; }
       });
       return;
     }
 
-    this.route.queryParamMap.subscribe(params => {
-      const templateId = params.get('templateId');
-      if (templateId) {
-        const res = findTemplate(templateId);
-        if (res) {
-          this.formName = res.template.name;
-          this.formType = res.template.type;
-          const source = res.template.type === 'KYB' ? MOCK_FORMS.find(f => f.id === 'form-002')
-            : res.template.type === 'AML' ? MOCK_FORMS.find(f => f.id === 'form-004')
-            : res.template.type === 'Combined' ? MOCK_FORMS.find(f => f.id === 'form-003')
-            : MOCK_FORMS.find(f => f.id === 'form-001');
-          this.sections.set(JSON.parse(JSON.stringify(source?.sections || [])));
-        }
-      } else if (this.sections().length === 0) {
-        this.sections.set([{ id: genId('sec'), title: 'Section 1', description: '', questions: [] }]);
-      }
-    });
+    const templateId = this.route.snapshot.queryParamMap.get('templateId');
+    if (templateId) {
+      // Older links: copy the template into a real form first, then continue on that form's own address.
+      this.api.useTemplate(templateId).subscribe({
+        next: id => this.router.navigate(['/app/form-builder', id], { replaceUrl: true }),
+        error: (e: ApiError) => this.error = e.userMessage
+      });
+      return;
+    }
+    this.sections.set([{ id: genId('sec'), title: 'Section 1', description: '', questions: [] }]);
   }
 
   addSection() {
@@ -144,28 +145,46 @@ export class FormBuilderComponent implements OnInit {
     return this.sections().reduce((sum, s) => sum + s.questions.length, 0);
   }
 
+  /** Saves the form (creating it on the first save); `live` publishes it afterwards. The server's message is shown if it refuses. */
   save(newStatus: ComplianceForm['status']) {
+    if (!this.formName.trim()) {
+      this.error = 'Give the form a name first.';
+      return;
+    }
     this.saving = true;
-    const form: ComplianceForm = {
-      id: this.formId || genId('form'),
-      name: this.formName,
-      type: this.formType,
-      status: newStatus,
-      sections: this.sections(),
-      createdAt: new Date().toISOString().slice(0, 10),
-      updatedAt: new Date().toISOString().slice(0, 10),
-      submissionsCount: 0,
-      completedCount: 0,
-      pendingReviewCount: 0,
-      webhookEnabled: false
-    };
-    this.data.saveForm(form).subscribe(() => {
-      this.saving = false;
-      this.saved = true;
-      this.status = newStatus;
-      this.publishModalOpen.set(false);
-      setTimeout(() => this.saved = false, 2500);
-      if (!this.formId) this.router.navigate(['/app/my-compliance']);
+    this.error = '';
+    const sections = this.sections();
+    const persist = this.currentId
+      ? this.api.updateForm(this.currentId, { name: this.formName.trim(), sections })
+      : this.api.createForm({ name: this.formName.trim(), type: this.formType, sections });
+    persist.subscribe({
+      next: f => {
+        this.currentId = f.summary.id;
+        if (newStatus === 'live' && this.status !== 'live') {
+          this.api.setFormStatus(f.summary.id, 'live').subscribe({
+            next: () => this.finish('live'),
+            error: (e: ApiError) => { this.saving = false; this.publishModalOpen.set(false); this.error = e.userMessage; this.afterFirstSave(); }
+          });
+        } else {
+          this.finish(this.status);
+        }
+      },
+      error: (e: ApiError) => { this.saving = false; this.publishModalOpen.set(false); this.error = e.userMessage; }
     });
+  }
+
+  private finish(status: ComplianceForm['status']) {
+    this.saving = false;
+    this.saved = true;
+    this.status = status;
+    this.publishModalOpen.set(false);
+    setTimeout(() => this.saved = false, 2500);
+    this.afterFirstSave();
+    if (status === 'live') this.router.navigate(['/app/my-compliance', this.currentId]);
+  }
+
+  /** A new form moves to its own address so a refresh (or the back button) reopens the saved form. */
+  private afterFirstSave() {
+    if (!this.formId && this.currentId) this.router.navigate(['/app/form-builder', this.currentId], { replaceUrl: true });
   }
 }

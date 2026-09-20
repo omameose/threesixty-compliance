@@ -1,3 +1,6 @@
+<div *ngIf="error()" class="mb-4 p-3 rounded-lg bg-red-50 text-red-700 text-sm" role="alert">{{ error() }}</div>
+<div *ngIf="notice()" class="mb-4 p-3 rounded-lg bg-brand-50 text-brand-800 text-sm" role="status">{{ notice() }}</div>
+
 <app-page-header title="My Compliance" subtitle="Manage your compliance forms — draft, publish, and track submissions.">
   <a routerLink="/app/form-builder" class="btn-primary"><app-icon name="plus" [size]="16"></app-icon> New Compliance Form</a>
 </app-page-header>
@@ -39,7 +42,7 @@
         <tr *ngFor="let f of filtered()">
           <td>
             <p class="font-medium text-ink-900">{{ f.name }}</p>
-            <p class="text-xs text-ink-400">{{ f.sections.length }} sections</p>
+            <p class="text-xs text-ink-400">{{ (f.sectionCount ?? 0) }} sections</p>
           </td>
           <td><span class="badge-blue">{{ f.type }}</span></td>
           <td>
@@ -112,7 +115,7 @@
         </div>
 
         <a [routerLink]="['/app/my-compliance', f.id]" class="font-semibold text-ink-900 text-sm mb-1 block hover:text-brand-600">{{ f.name }}</a>
-        <p class="text-xs text-ink-500 mb-3">{{ f.sections.length }} sections &middot; {{ f.submissionsCount }} submissions</p>
+        <p class="text-xs text-ink-500 mb-3">{{ (f.sectionCount ?? 0) }} sections &middot; {{ f.submissionsCount }} submissions</p>
 
         <div class="flex items-center gap-2 mb-1">
           <div class="flex-1 h-1.5 bg-ink-100 rounded-full overflow-hidden">

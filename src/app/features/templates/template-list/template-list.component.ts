@@ -1,7 +1,8 @@
 import { CommonModule } from '@angular/common';
 import { Component, Input, OnChanges, signal } from '@angular/core';
 import { RouterLink } from '@angular/router';
-import { DataService } from '../../../core/services/data.service';
+import { ApiError } from '../../../core/http/api.service';
+import { ComplianceApiService } from '../../../core/services/compliance-api.service';
 import { Industry, Sector } from '../../../core/models/models';
 import { PageHeaderComponent } from '../../../shared/components/page-header/page-header.component';
 import { IconComponent } from '../../../shared/components/icon/icon.component';
@@ -31,6 +32,7 @@ import { IconComponent } from '../../../shared/components/icon/icon.component';
       <a [routerLink]="['/app/templates', sectorId]" class="btn-secondary"><app-icon name="arrow-left" [size]="15"></app-icon> Back</a>
     </app-page-header>
 
+    <div *ngIf="error" class="mb-4 p-3 rounded-lg bg-red-50 text-red-700 text-sm" role="alert">{{ error }}</div>
     <div *ngIf="industry" [ngSwitch]="view()">
       <div *ngSwitchCase="'grid'" class="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
         <div *ngFor="let tpl of industry.templates" class="card p-6 flex flex-col">
@@ -74,11 +76,17 @@ export class TemplateListComponent implements OnChanges {
   sector?: Sector;
   industry?: Industry;
   view = signal<'grid' | 'list'>('grid');
+  error = '';
 
-  constructor(private data: DataService) {}
+  constructor(private api: ComplianceApiService) {}
 
   ngOnChanges() {
-    if (this.sectorId) this.data.getSector(this.sectorId).subscribe(s => this.sector = s);
-    if (this.sectorId && this.industryId) this.data.getIndustry(this.sectorId, this.industryId).subscribe(i => this.industry = i);
+    if (this.sectorId) this.api.sector(this.sectorId).subscribe({ next: s => this.sector = s, error: (e: ApiError) => this.error = e.userMessage });
+    if (this.sectorId && this.industryId) {
+      this.api.industry(this.sectorId, this.industryId).subscribe({
+        next: i => { this.industry = i; this.error = i ? '' : 'That industry was not found.'; },
+        error: (e: ApiError) => this.error = e.userMessage
+      });
+    }
   }
 }

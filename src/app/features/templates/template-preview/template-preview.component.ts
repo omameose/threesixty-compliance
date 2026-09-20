@@ -1,11 +1,11 @@
 import { CommonModule } from '@angular/common';
 import { Component, Input, OnChanges } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
-import { DataService } from '../../../core/services/data.service';
+import { ApiError } from '../../../core/http/api.service';
+import { ComplianceApiService } from '../../../core/services/compliance-api.service';
 import { ComplianceTemplateSummary, FormSection, Industry, Sector } from '../../../core/models/models';
 import { PageHeaderComponent } from '../../../shared/components/page-header/page-header.component';
 import { IconComponent } from '../../../shared/components/icon/icon.component';
-import { MOCK_FORMS } from '../../../core/mock/forms.mock';
 
 @Component({
   selector: 'app-template-preview',
@@ -22,6 +22,7 @@ import { MOCK_FORMS } from '../../../core/mock/forms.mock';
       <span class="text-ink-700 font-medium">{{ template?.name }}</span>
     </nav>
 
+    <div *ngIf="error" class="mb-4 p-3 rounded-lg bg-red-50 text-red-700 text-sm" role="alert">{{ error }}</div>
     <div class="card p-6 mb-6" *ngIf="template">
       <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
@@ -34,7 +35,7 @@ import { MOCK_FORMS } from '../../../core/mock/forms.mock';
         </div>
         <div class="flex gap-3 shrink-0">
           <a [routerLink]="['/app/templates', sectorId, industryId]" class="btn-secondary"><app-icon name="arrow-left" [size]="15"></app-icon> Back</a>
-          <button class="btn-primary" (click)="useTemplate()"><app-icon name="form-builder" [size]="16"></app-icon> Use This Template</button>
+          <button class="btn-primary" [disabled]="using" (click)="useTemplate()"><app-icon name="form-builder" [size]="16"></app-icon> {{ using ? 'Creating your form...' : 'Use This Template' }}</button>
         </div>
       </div>
       <div class="grid grid-cols-3 gap-4 mt-6 pt-6 border-t border-ink-100">
@@ -87,29 +88,29 @@ export class TemplatePreviewComponent implements OnChanges {
   template?: ComplianceTemplateSummary;
   previewSections: FormSection[] = [];
 
-  constructor(private data: DataService, private router: Router) {}
+  error = '';
+  using = false;
+
+  constructor(private api: ComplianceApiService, private router: Router) {}
 
   ngOnChanges() {
-    if (this.sectorId) this.data.getSector(this.sectorId).subscribe(s => this.sector = s);
-    if (this.sectorId && this.industryId) this.data.getIndustry(this.sectorId, this.industryId).subscribe(i => this.industry = i);
+    if (this.sectorId) this.api.sector(this.sectorId).subscribe({ next: s => this.sector = s, error: () => undefined });
+    if (this.sectorId && this.industryId) this.api.industry(this.sectorId, this.industryId).subscribe({ next: i => this.industry = i, error: () => undefined });
     if (this.templateId) {
-      this.data.getTemplate(this.templateId).subscribe(res => {
-        this.template = res?.template;
-        this.buildPreviewSections();
+      this.api.template(this.templateId).subscribe({
+        next: res => { this.template = res.template; this.previewSections = res.sections; },
+        error: (e: ApiError) => this.error = e.userMessage
       });
     }
   }
 
-  private buildPreviewSections() {
-    const type = this.template?.type || 'KYC';
-    const source = type === 'KYB' ? MOCK_FORMS.find(f => f.id === 'form-002')
-      : type === 'AML' ? MOCK_FORMS.find(f => f.id === 'form-004')
-      : type === 'Combined' ? MOCK_FORMS.find(f => f.id === 'form-003')
-      : MOCK_FORMS.find(f => f.id === 'form-001');
-    this.previewSections = JSON.parse(JSON.stringify(source?.sections || []));
-  }
-
+  /** Copies the template into a new draft form of the company, then opens it in the builder. */
   useTemplate() {
-    this.router.navigate(['/app/form-builder'], { queryParams: { templateId: this.templateId } });
+    this.using = true;
+    this.error = '';
+    this.api.useTemplate(this.templateId).subscribe({
+      next: formId => this.router.navigate(['/app/form-builder', formId]),
+      error: (e: ApiError) => { this.using = false; this.error = e.userMessage; }
+    });
   }
 }

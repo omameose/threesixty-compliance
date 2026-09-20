@@ -12,6 +12,15 @@ export interface ChangePlanRequest {
   paymentToken?: string;
 }
 
+export interface GatewayOption { key: string; name: string; }
+
+/** A payment on a gateway's own page. `checkoutUrl` is only present while it can still be paid. */
+export interface Checkout {
+  reference: string; gateway: string; gatewayName: string; status: 'initiated' | 'pending' | 'success' | 'failed' | 'abandoned';
+  checkoutUrl?: string; amount: number; currency: string; invoiceNumber: string; description?: string; failureReason?: string;
+  planUpdated: boolean; createdAt: string;
+}
+
 interface PlanDto {
   id: string; name: string; price: number; annualPrice?: number | null; billingCycle: 'month' | 'year'; currency: string;
   description: string; verificationsIncluded: number; overagePrice: number; features: string[]; highlighted: boolean;
@@ -85,6 +94,25 @@ export class SubscriptionApiService {
     return this.api.post<SubscriptionDto>('/subscription/change-plan', request, { headers: { 'Idempotency-Key': idempotencyKey } }).pipe(
       map(() => undefined as unknown as Subscription)
     );
+  }
+
+  /** The ways to pay on a gateway's page that are switched on for this environment. */
+  getGateways(): Observable<GatewayOption[]> {
+    return this.api.get('/subscription/gateways');
+  }
+
+  /** Starts a payment on a gateway's page. Reuse the same key when retrying the same action. */
+  startCheckout(request: { planId: string; billingCycle: 'month' | 'year'; gateway: string }, idempotencyKey: string): Observable<Checkout> {
+    return this.api.post<Checkout>('/subscription/checkout', request, { headers: { 'Idempotency-Key': idempotencyKey } });
+  }
+
+  /** Asks the gateway (through our server) how the payment went. Safe to call repeatedly. */
+  verifyCheckout(reference: string): Observable<Checkout> {
+    return this.api.post<Checkout>(`/subscription/checkout/${encodeURIComponent(reference)}/verify`, {});
+  }
+
+  cancelCheckout(reference: string): Observable<Checkout> {
+    return this.api.post<Checkout>(`/subscription/checkout/${encodeURIComponent(reference)}/cancel`, {});
   }
 
   cancel(idempotencyKey: string): Observable<void> {

@@ -1,3 +1,4 @@
+<div *ngIf="error()" class="mb-4 p-3 rounded-lg bg-red-50 text-red-700 text-sm" role="alert">{{ error() }}</div>
 <app-page-header title="My Clients" subtitle="All customers who have started or completed a verification with your business.">
   <button class="btn-primary" (click)="linkModalOpen.set(true)"><app-icon name="link" [size]="16"></app-icon> Generate KYC Link</button>
 </app-page-header>
@@ -180,6 +181,12 @@
   <p class="text-sm text-ink-600" *ngIf="pendingMove() as pm">
     Move <strong>{{ pm.customer.fullName }}</strong> to <strong>{{ pm.toLabel }}</strong>? Their KYC/KYB status will be updated immediately.
   </p>
+  <div class="mt-4" *ngIf="pendingMove() as pm">
+    <ng-container *ngIf="pm.toStatus === 'rejected' || pm.toStatus === 'more_info_required'">
+      <label class="label">{{ pm.toStatus === 'rejected' ? 'Reason for rejecting (the customer is told)' : 'What do you need from the customer?' }}</label>
+      <textarea class="input" rows="3" maxlength="2000" [(ngModel)]="moveNote"></textarea>
+    </ng-container>
+  </div>
   <div modal-footer class="flex gap-3 w-full sm:w-auto">
     <button class="btn-secondary flex-1" (click)="cancelMove()">Cancel</button>
     <button class="btn-primary flex-1" (click)="confirmMove()">Yes, Move It</button>
@@ -191,40 +198,35 @@
     <div>
       <label class="label">Compliance form</label>
       <select class="input" [(ngModel)]="newCustomerForm">
-        <option *ngFor="let f of forms" [value]="f.id">{{ f.name }}</option>
+        <option *ngFor="let f of forms" [value]="f.id">{{ f.name }} ({{ f.status }})</option>
       </select>
     </div>
     <div>
-      <label class="label">Customer full name</label>
-      <input class="input" [(ngModel)]="newCustomerName" placeholder="e.g. Jane Doe"/>
+      <label class="label">Link name (optional)</label>
+      <input class="input" [(ngModel)]="linkLabel" maxlength="150" placeholder="e.g. Website onboarding"/>
     </div>
-    <div>
-      <label class="label">Customer email (optional)</label>
-      <input class="input" [(ngModel)]="newCustomerEmail" placeholder="jane@example.com"/>
-    </div>
-    <p class="text-xs text-ink-400">A unique compliance ID and password will be sent to this customer's email so they can start or resume their process.</p>
+    <p class="text-xs text-ink-400">Anyone with the link enters their name and email and confirms a code we send, so each person gets their own record and compliance ID. The form must be live for the link to work.</p>
   </div>
 
   <div *ngIf="generatedLink()" class="space-y-4">
     <div class="rounded-lg bg-brand-50 p-4 text-center">
       <app-icon name="check-circle" [size]="28" class="text-brand-600 mx-auto mb-2"></app-icon>
       <p class="font-medium text-ink-900">Link generated successfully</p>
-      <p class="text-xs text-ink-500 mt-1">Compliance ID: <span class="font-mono font-semibold">{{ generatedLink()?.complianceId }}</span></p>
     </div>
     <div>
       <label class="label">Shareable KYC/KYB Link</label>
       <div class="flex gap-2">
-        <input class="input font-mono text-xs" [value]="generatedLink()?.link" readonly/>
+        <input class="input font-mono text-xs" [value]="generatedLink()?.url" readonly/>
         <button class="btn-secondary shrink-0" (click)="copyLink()">
           <app-icon [name]="copied() ? 'check' : 'copy'" [size]="16"></app-icon>
         </button>
       </div>
     </div>
-    <p class="text-xs text-ink-400">You can also call <span class="font-mono bg-ink-100 px-1.5 py-0.5 rounded">POST /v1/compliance-links</span> from your backend to generate this per customer.</p>
+    <p class="text-xs text-ink-400">Share this link with your customers by email, chat or on your website.</p>
   </div>
 
   <div modal-footer class="flex gap-3 w-full sm:w-auto">
     <button class="btn-secondary flex-1" (click)="closeLinkModal()">{{ generatedLink() ? 'Done' : 'Cancel' }}</button>
-    <button *ngIf="!generatedLink()" class="btn-primary flex-1" [disabled]="!newCustomerName.trim()" (click)="generateLink()">Generate Link</button>
+    <button *ngIf="!generatedLink()" class="btn-primary flex-1" [disabled]="creating() || !newCustomerForm" (click)="generateLink()">{{ creating() ? 'Creating...' : 'Generate Link' }}</button>
   </div>
 </app-modal>

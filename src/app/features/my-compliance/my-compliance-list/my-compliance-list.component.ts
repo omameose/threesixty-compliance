@@ -3,7 +3,8 @@ import { Component, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
 import { CdkDragDrop, DragDropModule, moveItemInArray, transferArrayItem } from '@angular/cdk/drag-drop';
-import { DataService } from '../../../core/services/data.service';
+import { ApiError } from '../../../core/http/api.service';
+import { ComplianceApiService, toForm } from '../../../core/services/compliance-api.service';
 import { ComplianceForm, ComplianceFormStatus } from '../../../core/models/models';
 import { PageHeaderComponent } from '../../../shared/components/page-header/page-header.component';
 import { IconComponent } from '../../../shared/components/icon/icon.component';
@@ -46,14 +47,19 @@ export class MyComplianceListComponent implements OnInit {
   board: Record<ComplianceFormStatus, ComplianceForm[]> = { draft: [], in_review: [], live: [], paused: [], archived: [] };
   expandedIds = signal<Set<string>>(new Set());
   pendingMove = signal<PendingMove | null>(null);
+  error = signal('');
+  notice = signal('');
 
-  constructor(private data: DataService) {}
+  constructor(private api: ComplianceApiService) {}
 
   ngOnInit() { this.load(); }
 
   load() {
     this.loading = true;
-    this.data.getForms().subscribe(f => { this.forms = f; this.buildBoard(); this.loading = false; });
+    this.api.forms().subscribe({
+      next: f => { this.forms = f.map(toForm); this.buildBoard(); this.loading = false; },
+      error: (e: ApiError) => { this.error.set(e.userMessage); this.loading = false; }
+    });
   }
 
   buildBoard() {
@@ -73,9 +79,13 @@ export class MyComplianceListComponent implements OnInit {
   confirmDelete() {
     const target = this.deleteTarget();
     if (!target) return;
-    this.data.deleteForm(target.id).subscribe(() => {
-      this.deleteTarget.set(null);
-      this.load();
+    this.api.deleteForm(target.id).subscribe({
+      next: r => {
+        this.deleteTarget.set(null);
+        this.notice.set(r.message);
+        this.load();
+      },
+      error: (e: ApiError) => { this.deleteTarget.set(null); this.error.set(e.userMessage); }
     });
   }
 
@@ -144,10 +154,18 @@ export class MyComplianceListComponent implements OnInit {
   confirmMove() {
     const pm = this.pendingMove();
     if (!pm) return;
-    pm.form.status = pm.toStatus;
-    this.data.updateFormStatus(pm.form.id, pm.toStatus).subscribe(() => {
-      this.commitBoardOrder();
-      this.pendingMove.set(null);
+    this.error.set('');
+    this.api.setFormStatus(pm.form.id, pm.toStatus).subscribe({
+      next: () => {
+        pm.form.status = pm.toStatus;
+        this.commitBoardOrder();
+        this.pendingMove.set(null);
+      },
+      // The server said no (for example a half-built form cannot go live): put the card back and show why.
+      error: (e: ApiError) => {
+        this.cancelMove();
+        this.error.set(e.userMessage);
+      }
     });
   }
 
@@ -161,6 +179,9 @@ export class MyComplianceListComponent implements OnInit {
   private commitBoardOrder() {
     const flat = this.boardColumns.flatMap(c => this.board[c.status]);
     this.forms = flat;
-    this.data.reorderForms(flat);
+    for (const c of this.boardColumns) {
+      const ids = this.board[c.status].map(f => f.id);
+      if (ids.length) this.api.reorderForms(c.status, ids).subscribe({ error: (e: ApiError) => this.error.set(e.userMessage) });
+    }
   }
 }

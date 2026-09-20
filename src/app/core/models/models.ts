@@ -174,6 +174,8 @@ export interface ComplianceForm {
   status: ComplianceFormStatus;
   sourceTemplateId?: string;
   sections: FormSection[];
+  /** Set when the form comes from a list call, which does not carry the sections themselves. */
+  sectionCount?: number;
   createdAt: string;
   updatedAt: string;
   submissionsCount: number;
@@ -197,6 +199,7 @@ export interface CustomerAnswer {
   label: string;
   type: QuestionType;
   value: string;
+  fileId?: string;
   fileName?: string;
   fileSize?: string;
 }
@@ -221,6 +224,9 @@ export interface Customer {
   timeline: { label: string; date: string; note?: string }[];
   sanctionsHit: boolean;
   pepHit: boolean;
+  /** Only on the detail call. */
+  decisionReason?: string;
+  moreInfoMessage?: string;
 }
 
 // ===================== DASHBOARD ANALYTICS =====================

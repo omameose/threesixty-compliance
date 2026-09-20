@@ -3,6 +3,8 @@ import { Component, OnInit } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { ChartConfiguration, ChartData } from 'chart.js';
 import { forkJoin } from 'rxjs';
+import { ApiError } from '../../core/http/api.service';
+import { ComplianceApiService } from '../../core/services/compliance-api.service';
 import { DataService } from '../../core/services/data.service';
 import { DashboardStats } from '../../core/models/models';
 import { StatCardComponent } from '../../shared/components/stat-card/stat-card.component';
@@ -76,11 +78,13 @@ export class DashboardHomeComponent implements OnInit {
     scales: { x: { grid: { display: false } }, y: { beginAtZero: true, grid: { color: '#f0f2f4' } } }
   };
 
-  constructor(private data: DataService) {}
+  statsError = '';
+
+  constructor(private data: DataService, private api: ComplianceApiService) {}
 
   ngOnInit() {
     this.loadIntelligence();
-    this.data.getDashboardStats().subscribe(stats => {
+    this.api.dashboard().subscribe({ error: (e: ApiError) => { this.statsError = e.userMessage; this.loading = false; }, next: stats => {
       this.stats = stats;
       this.loading = false;
 
@@ -102,7 +106,7 @@ export class DashboardHomeComponent implements OnInit {
         labels: stats.riskBreakdown.map(r => r.level),
         datasets: [{ data: stats.riskBreakdown.map(r => r.value), backgroundColor: stats.riskBreakdown.map(r => r.color), borderRadius: 6, maxBarThickness: 22 }]
       };
-    });
+    } });
   }
 
   private loadIntelligence() {

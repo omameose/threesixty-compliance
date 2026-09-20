@@ -2,7 +2,8 @@ import { CommonModule } from '@angular/common';
 import { Component, OnInit } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { RouterLink } from '@angular/router';
-import { DataService } from '../../../core/services/data.service';
+import { ApiError } from '../../../core/http/api.service';
+import { ComplianceApiService } from '../../../core/services/compliance-api.service';
 import { Sector } from '../../../core/models/models';
 import { PageHeaderComponent } from '../../../shared/components/page-header/page-header.component';
 import { IconComponent } from '../../../shared/components/icon/icon.component';
@@ -19,6 +20,8 @@ import { IconComponent } from '../../../shared/components/icon/icon.component';
       </div>
     </app-page-header>
 
+    <div *ngIf="error" class="mb-4 p-3 rounded-lg bg-red-50 text-red-700 text-sm" role="alert">{{ error }}</div>
+    <p *ngIf="loaded && !error && !sectors.length" class="muted">No templates are available yet.</p>
     <div class="grid sm:grid-cols-2 lg:grid-cols-3 gap-5">
       <a *ngFor="let s of filteredSectors()" [routerLink]="['/app/templates', s.id]"
          class="card p-6 hover:shadow-lg hover:-translate-y-0.5 transition group">
@@ -38,11 +41,16 @@ import { IconComponent } from '../../../shared/components/icon/icon.component';
 export class SectorListComponent implements OnInit {
   sectors: Sector[] = [];
   query = '';
+  error = '';
+  loaded = false;
 
-  constructor(private data: DataService) {}
+  constructor(private api: ComplianceApiService) {}
 
   ngOnInit() {
-    this.data.getSectors().subscribe(s => this.sectors = s);
+    this.api.sectors().subscribe({
+      next: s => { this.sectors = s; this.loaded = true; },
+      error: (e: ApiError) => { this.error = e.userMessage; this.loaded = true; }
+    });
   }
 
   filteredSectors() {

@@ -124,6 +124,15 @@ export class DashboardLayoutComponent {
   company = this.dataService.company;
   user = this.auth.currentUser;
 
+  /** Screens whose data comes from the real backend. Anything else still shows built-in sample data and says so. */
+  private static readonly LIVE = ['/app/dashboard', '/app/templates', '/app/form-builder', '/app/my-compliance', '/app/my-clients', '/app/subscription',
+    '/app/teams', '/app/settings', '/app/profile', '/app/developer-console', '/app/verification-kyc'];
+
+  showingSampleData(): boolean {
+    const url = this.router.url;
+    return !DashboardLayoutComponent.LIVE.some(p => url === p || url.startsWith(p + '/') || url.startsWith(p + '?'));
+  }
+
   onVerificationPage(): boolean {
     return this.router.url.startsWith('/app/verification-kyc');
   }
