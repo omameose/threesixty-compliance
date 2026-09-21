@@ -1,5 +1,6 @@
 import { Routes } from '@angular/router';
 import { authGuard, guestGuard } from './core/guards/auth.guard';
+import { kycGuard } from './core/guards/kyc.guard';
 
 export const routes: Routes = [
   {
@@ -23,6 +24,7 @@ export const routes: Routes = [
   {
     path: 'app',
     canActivate: [authGuard],
+    canActivateChild: [kycGuard],
     loadComponent: () => import('./features/dashboard-layout/dashboard-layout.component').then(m => m.DashboardLayoutComponent),
     children: [
       { path: '', redirectTo: 'dashboard', pathMatch: 'full' },

@@ -55,6 +55,7 @@ interface AnswerDto { questionId: string; label: string; type: Customer['answers
 interface CustomerDetailDto {
   customer: CustomerItemDto; answers: AnswerDto[]; timeline: { label: string; date: string; note?: string }[];
   moreInfo?: { message: string }; decisionReason?: string;
+  verifications?: { type: string; status: string; matchScore?: number | null }[];
 }
 
 /** Answers arrive as strings, numbers, booleans or lists depending on the question; the screens show text. */
@@ -182,7 +183,8 @@ export class ComplianceApiService {
       ...toCustomer(d.customer),
       answers: d.answers.map(a => ({ questionId: a.questionId, label: a.label, type: a.type, value: answerText(a.value), fileId: a.fileId, fileName: a.fileName, fileSize: a.fileSize })),
       timeline: d.timeline.map(t => ({ label: t.label, date: day(t.date), note: t.note })),
-      decisionReason: d.decisionReason, moreInfoMessage: d.moreInfo?.message
+      decisionReason: d.decisionReason, moreInfoMessage: d.moreInfo?.message,
+      verifications: (d.verifications ?? []).map(v => ({ type: v.type, status: v.status, matchScore: v.matchScore }))
     })));
   }
 

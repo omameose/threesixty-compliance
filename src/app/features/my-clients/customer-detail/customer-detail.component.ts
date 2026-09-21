@@ -3,25 +3,15 @@ import { Component, Input, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { Location } from '@angular/common';
 import { RouterLink } from '@angular/router';
-import { forkJoin } from 'rxjs';
+import { AuthService } from '../../../core/services/auth.service';
 import { ApiError } from '../../../core/http/api.service';
 import { ComplianceApiService } from '../../../core/services/compliance-api.service';
-import { DataService } from '../../../core/services/data.service';
+import { AiApiService, ProfileAnalysis, ScreeningResult } from '../../../core/services/ai-api.service';
 import { Customer } from '../../../core/models/models';
 import { IconComponent } from '../../../shared/components/icon/icon.component';
 import { AvatarComponent } from '../../../shared/components/avatar/avatar.component';
 import { ModalComponent } from '../../../shared/components/modal/modal.component';
 
-type ScanType = 'sanctions' | 'pep' | 'adverse-media';
-
-interface IntelligenceEntry {
-  type: 'Sanctions' | 'PEP' | 'Adverse Media';
-  verdict: string;
-  score: number;
-  date: string;
-  caseId: string;
-  route: string;
-}
 
 @Component({
   selector: 'app-customer-detail',
@@ -42,75 +32,47 @@ export class CustomerDetailComponent implements OnInit {
   error = signal('');
   acting = signal(false);
 
-  intelligence: IntelligenceEntry[] = [];
-  intelligenceLoading = true;
-  runningScan = signal<ScanType | null>(null);
+  profile = signal<ProfileAnalysis | null>(null);
+  profileError = signal('');
+  screening = signal(false);
+  screenResult = signal<ScreeningResult | null>(null);
+  screenError = signal('');
 
-  constructor(private data: DataService, private api: ComplianceApiService, private location: Location) {}
+  constructor(private ai: AiApiService, private api: ComplianceApiService, private location: Location, public auth: AuthService) {}
 
   ngOnInit() {
     this.api.customer(this.customerId).subscribe({
       next: c => {
         this.customer = c;
         this.loading = false;
-        this.loadIntelligence(c);
+        this.loadProfile(c);
       },
       error: (e: ApiError) => { this.loading = false; this.error.set(e.userMessage); }
     });
   }
 
-  private dobFromAnswers(): string | undefined {
-    return this.customer?.answers.find(a => a.label === 'Date of Birth')?.value;
+  /** The customer's data quality, identity consistency and document coverage, worked out from what they submitted and the checks run on them. */
+  private loadProfile(c: Customer) {
+    if (!this.auth.hasMinRole(2)) return;
+    this.ai.profile({
+      customer: { id: c.id, fullName: c.fullName, email: c.email, phone: c.phone || undefined, country: c.country || undefined, formName: c.formName },
+      verifications: (c.verifications ?? []).map(v => ({ type: v.type, status: v.status, matchScore: v.matchScore ?? undefined })),
+      documents: c.answers.filter(a => a.fileName).map(a => ({ type: a.label, name: a.fileName, status: 'submitted' })),
+      requiredDocuments: [],
+      history: { previousSubmissions: 0, previousRejections: 0 }
+    }).subscribe({ next: p => this.profile.set(p), error: (e: ApiError) => this.profileError.set(e.userMessage) });
   }
 
-  loadIntelligence(customer: Customer) {
-    this.intelligenceLoading = true;
-    forkJoin({
-      sanctions: this.data.getSanctionsCasesForCustomer(customer),
-      pep: this.data.getPepCasesForCustomer(customer),
-      adverseMedia: this.data.getAdverseMediaCasesForCustomer(customer)
-    }).subscribe(({ sanctions, pep, adverseMedia }) => {
-      const entries: IntelligenceEntry[] = [
-        ...sanctions.map(c => ({ type: 'Sanctions' as const, verdict: c.verdict, score: c.matchScore, date: c.screenedAt, caseId: c.id, route: '/app/screening/sanctions' })),
-        ...pep.map(c => ({ type: 'PEP' as const, verdict: c.verdict, score: c.confidenceScore, date: c.screenedAt, caseId: c.id, route: '/app/screening/pep' })),
-        ...adverseMedia.map(c => ({ type: 'Adverse Media' as const, verdict: c.verdict, score: c.riskScore, date: c.screenedAt, caseId: c.id, route: '/app/screening/adverse-media' }))
-      ];
-      entries.sort((a, b) => b.date.localeCompare(a.date));
-      this.intelligence = entries;
-      this.intelligenceLoading = false;
-    });
-  }
-
-  verdictBadge(verdict: string) {
-    if (verdict === 'MATCH' || verdict === 'PEP_MATCH') return 'badge-red';
-    if (verdict === 'POTENTIAL_MATCH' || verdict === 'POTENTIAL_PEP' || verdict === 'POTENTIAL_RISK') return 'badge-yellow';
-    return 'badge-green';
-  }
-
-  runScan(type: ScanType) {
-    if (!this.customer || this.runningScan()) return;
-    this.runningScan.set(type);
+  /** Screens this customer's name against the loaded watchlist (a demonstration list unless a real one is configured on the server). */
+  screenCustomer() {
     const c = this.customer;
-
-    if (type === 'sanctions') {
-      this.data.runSanctionsScreening({
-        subjectName: c.fullName, subjectType: 'Individual', dob: this.dobFromAnswers(),
-        nationality: c.country, country: c.country, identifiers: [c.complianceId], customerId: c.id
-      }).subscribe(result => this.finishScan('Sanctions Screening', result.verdict));
-    } else if (type === 'pep') {
-      this.data.runPepScreening({ subjectName: c.fullName, customerId: c.id })
-        .subscribe(result => this.finishScan('PEP Screening', result.verdict));
-    } else {
-      this.data.runAdverseMediaScreening({ subjectName: c.fullName, customerId: c.id })
-        .subscribe(result => this.finishScan('Adverse Media Screening', result.verdict));
-    }
-  }
-
-  private finishScan(label: string, verdict: string) {
-    this.runningScan.set(null);
-    if (this.customer) this.loadIntelligence(this.customer);
-    this.actionSuccess.set(`${label} complete — result: ${verdict.replace('_', ' ')}.`);
-    setTimeout(() => this.actionSuccess.set(null), 4000);
+    if (!c || this.screening()) return;
+    this.screening.set(true);
+    this.screenError.set('');
+    this.ai.screen({ name: c.fullName, country: c.country || undefined, threshold: 0.85 }).subscribe({
+      next: r => { this.screening.set(false); this.screenResult.set(r); },
+      error: (e: ApiError) => { this.screening.set(false); this.screenError.set(e.userMessage); }
+    });
   }
 
   statusLabel(s: Customer['status']) {

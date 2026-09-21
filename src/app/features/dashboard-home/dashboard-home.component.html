@@ -81,66 +81,44 @@
   <div class="flex items-center justify-between mt-10 mb-4">
     <div>
       <h2 class="text-lg font-bold text-ink-900">Compliance &amp; Risk Intelligence</h2>
-      <p class="muted">Screening, detection and investigation signals. <span class="badge-yellow ml-1">Sample data</span> These tiles are not connected to your account yet.</p>
+      <p class="muted">Investigations and a portfolio summary, worked out from your own customers and cases.</p>
     </div>
-    <a routerLink="/app/war-room" class="btn-secondary btn-sm"><app-icon name="activity" [size]="14"></app-icon> Executive War Room</a>
+    <a routerLink="/app/cases" class="btn-secondary btn-sm"><app-icon name="folder" [size]="14"></app-icon> Case Management</a>
   </div>
 
+  <p *ngIf="intelLoading" class="text-ink-400 py-6">Loading...</p>
+  <p *ngIf="!intelLoading && !cases && !portfolio" class="muted py-4">Investigation and portfolio insights appear here for the Reviewer role (level 3) and above.</p>
+
   <ng-container *ngIf="!intelLoading">
-    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-5">
-      <app-stat-card label="Open Alerts" [value]="openAlertsCount" [delta]="0" icon="bell"></app-stat-card>
-      <app-stat-card label="Active Investigations" [value]="activeInvestigations" [delta]="0" icon="folder"></app-stat-card>
-      <app-stat-card label="Sanctions Matches" [value]="sanctionsMatches" [delta]="0" icon="shield"></app-stat-card>
-      <app-stat-card label="PEP Matches" [value]="pepMatches" [delta]="0" icon="user-check"></app-stat-card>
+    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-5" *ngIf="cases">
+      <app-stat-card label="Open Cases" [value]="cases.open" [delta]="0" icon="folder"></app-stat-card>
+      <app-stat-card label="Overdue Cases" [value]="cases.overdue" [delta]="0" icon="bell"></app-stat-card>
+      <app-stat-card label="High / Critical" [value]="(cases.bySeverity['high'] || 0) + (cases.bySeverity['critical'] || 0)" [delta]="0" icon="shield"></app-stat-card>
+      <app-stat-card label="Avg. Days to Close" [value]="cases.averageDaysToClose === null ? '\u2014' : (cases.averageDaysToClose | number: '1.0-1')" [delta]="0" icon="clock"></app-stat-card>
     </div>
 
-    <div class="grid lg:grid-cols-3 gap-5 mb-5">
-      <div class="card p-5">
-        <h3 class="font-semibold text-ink-900 mb-1">Alerts by Severity</h3>
-        <p class="muted mb-4">All open and historical alerts</p>
+    <div class="grid lg:grid-cols-3 gap-5">
+      <div class="card p-5" *ngIf="cases">
+        <h3 class="font-semibold text-ink-900 mb-1">Cases by Severity</h3>
+        <p class="muted mb-4">All cases opened so far</p>
         <div style="height: 180px;">
           <app-chart type="bar" [data]="alertSeverityChartData" [options]="alertSeverityChartOptions"></app-chart>
         </div>
       </div>
 
-      <div class="card p-5 lg:col-span-2">
-        <h3 class="font-semibold text-ink-900 mb-1">Screening Snapshot</h3>
-        <p class="muted mb-4">Sanctions, PEP and adverse-media verdicts across screened subjects</p>
-        <div style="height: 180px;">
-          <app-chart type="bar" [data]="screeningChartData" [options]="screeningChartOptions"></app-chart>
+      <div class="card p-5" [class.lg:col-span-2]="cases" [class.lg:col-span-3]="!cases" *ngIf="portfolio">
+        <h3 class="font-semibold text-ink-900 mb-1">Customer Portfolio</h3>
+        <p class="text-sm text-ink-700 mb-4">{{ portfolio.summary }}</p>
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
+          <div><p class="muted">Customers</p><p class="text-xl font-bold text-ink-950">{{ portfolio.total }}</p></div>
+          <div><p class="muted">Approval rate</p><p class="text-xl font-bold text-ink-950">{{ portfolio.approvalRatePercent === null ? '\u2014' : portfolio.approvalRatePercent + '%' }}</p></div>
+          <div><p class="muted">Avg. review time</p><p class="text-xl font-bold text-ink-950">{{ portfolio.averageReviewDays === null ? '\u2014' : (portfolio.averageReviewDays | number: '1.0-1') + ' d' }}</p></div>
+          <div><p class="muted">High risk</p><p class="text-xl font-bold" [class.text-red-600]="portfolio.highRiskShare > 20">{{ portfolio.highRiskShare }}%</p></div>
         </div>
+        <p class="text-xs text-ink-500 mt-4" *ngIf="portfolio.topCountries.length">Top countries: {{ topCountries() }}</p>
       </div>
     </div>
-
-    <div class="grid lg:grid-cols-3 gap-5">
-      <a routerLink="/app/detection/transaction-monitoring" class="card p-5 hover:shadow-lg hover:-translate-y-0.5 transition">
-        <div class="flex items-center justify-between mb-1">
-          <h3 class="font-semibold text-ink-900">Transaction Monitoring</h3>
-          <app-icon name="activity" [size]="16" class="text-brand-600"></app-icon>
-        </div>
-        <p class="text-2xl font-bold text-red-500 mt-2">{{ tmsEscalated }}</p>
-        <p class="muted">Scenario hits escalated for investigation</p>
-      </a>
-      <a routerLink="/app/detection/fraud" class="card p-5 hover:shadow-lg hover:-translate-y-0.5 transition">
-        <div class="flex items-center justify-between mb-1">
-          <h3 class="font-semibold text-ink-900">Fraud Detection</h3>
-          <app-icon name="alert-triangle" [size]="16" class="text-brand-600"></app-icon>
-        </div>
-        <p class="text-2xl font-bold text-red-500 mt-2">{{ fraudEscalated }}</p>
-        <p class="muted">Fraud typology hits escalated</p>
-      </a>
-      <a routerLink="/app/model-governance" class="card p-5 hover:shadow-lg hover:-translate-y-0.5 transition">
-        <div class="flex items-center justify-between mb-1">
-          <h3 class="font-semibold text-ink-900">Model Health</h3>
-          <app-icon name="cpu" [size]="16" class="text-brand-600"></app-icon>
-        </div>
-        <p class="text-2xl font-bold text-ink-900 mt-2">{{ avgModelPrecision }}% <span class="text-sm font-medium text-ink-400">avg. precision</span></p>
-        <p class="muted">{{ modelsInReview }} model(s) currently in review</p>
-      </a>
-    </div>
   </ng-container>
-
-  <div *ngIf="intelLoading" class="flex items-center justify-center py-16 text-ink-400">Loading compliance intelligence...</div>
 </ng-container>
 
 <div *ngIf="loading" class="flex items-center justify-center py-24 text-ink-400">Loading dashboard...</div>

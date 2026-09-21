@@ -1,3 +1,4 @@
+import { isKycExempt } from '../guards/kyc.guard';
 import { HttpErrorResponse, HttpInterceptorFn } from '@angular/common/http';
 import { inject } from '@angular/core';
 import { Router } from '@angular/router';
@@ -20,7 +21,7 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
   return next(withToken(auth.getToken())).pipe(
     catchError((err: HttpErrorResponse) => {
       // Code 35: the company is not approved yet, so send people to the verification form instead of leaving a dead screen.
-      if (err.status === 403 && (err.error as { code?: string } | null)?.code === '35' && !router.url.startsWith('/app/verification-kyc')) {
+      if (err.status === 403 && (err.error as { code?: string } | null)?.code === '35' && !isKycExempt(router.url)) {
         router.navigate(['/app/verification-kyc']);
       }
       if (err.status !== 401 || !auth.getRefreshToken()) return throwError(() => err);

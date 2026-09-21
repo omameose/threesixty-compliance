@@ -1,134 +1,153 @@
 import { CommonModule } from '@angular/common';
-import { Component, signal } from '@angular/core';
+import { Component, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
-import { DataService } from '../../../core/services/data.service';
-import { Customer, CustomerRiskBreakdown, RiskFactorWeight, RiskTierThreshold } from '../../../core/models/models';
+import { Router, RouterLink } from '@angular/router';
+import { ApiError } from '../../../core/http/api.service';
+import { AiApiService, RiskScore, RiskScoreRequest } from '../../../core/services/ai-api.service';
+import { AuthService } from '../../../core/services/auth.service';
+import { ComplianceApiService } from '../../../core/services/compliance-api.service';
+import { Customer } from '../../../core/models/models';
 import { PageHeaderComponent } from '../../../shared/components/page-header/page-header.component';
-import { IconComponent } from '../../../shared/components/icon/icon.component';
-import { AvatarComponent } from '../../../shared/components/avatar/avatar.component';
-import { EmptyStateComponent } from '../../../shared/components/empty-state/empty-state.component';
 
+const LEVEL_BADGE: Record<string, string> = { low: 'badge-green', medium: 'badge-yellow', high: 'badge-red', critical: 'badge-red' };
+
+/**
+ * Customer risk assessment. The score, factors, due-diligence level and review frequency are computed by fixed, explainable rules from what
+ * you enter (the country list is a built-in starting point that your compliance team should review); a language model, if configured, only
+ * words the explanation. Below it: how your real customers scored when they were onboarded.
+ */
 @Component({
   selector: 'app-customer-risk-engine',
   standalone: true,
-  imports: [CommonModule, FormsModule, PageHeaderComponent, IconComponent, AvatarComponent, EmptyStateComponent],
-  templateUrl: './customer-risk-engine.component.html'
+  imports: [CommonModule, FormsModule, RouterLink, PageHeaderComponent],
+  template: `
+  <app-page-header title="Customer Risk Engine" subtitle="Score a customer's risk and see exactly which factors drove it."></app-page-header>
+  <div *ngIf="error()" class="mb-4 p-3 rounded-lg bg-red-50 text-red-700 text-sm" role="alert">{{ error() }}</div>
+  <p *ngIf="!canRun" class="mb-4 text-sm text-ink-500">Scoring needs the Reviewer role (level 3) or higher.</p>
+
+  <div class="grid lg:grid-cols-[minmax(0,420px)_1fr] gap-5 items-start">
+    <section class="card p-5">
+      <h2 class="font-semibold text-ink-900 mb-3">What do you know about the customer?</h2>
+      <form (ngSubmit)="run()" class="space-y-3" novalidate>
+        <div class="grid grid-cols-2 gap-3">
+          <div><label class="label" for="r-type">Customer is</label><select id="r-type" class="input" [(ngModel)]="f.subjectType" name="subjectType"><option value="individual">A person</option><option value="business">A business</option></select></div>
+          <div><label class="label" for="r-country">Country</label><input id="r-country" class="input" [(ngModel)]="f.country" name="country" maxlength="80"/></div>
+          <div><label class="label" for="r-nat">Nationality</label><input id="r-nat" class="input" [(ngModel)]="f.nationality" name="nationality" maxlength="80"/></div>
+          <div><label class="label" for="r-op">Operating country</label><input id="r-op" class="input" [(ngModel)]="f.operatingCountry" name="operatingCountry" maxlength="80"/></div>
+          <div class="col-span-2"><label class="label" for="r-ind">Industry</label><input id="r-ind" class="input" [(ngModel)]="f.industry" name="industry" maxlength="120" placeholder="e.g. Money transfer, Real estate"/></div>
+          <div><label class="label" for="r-prod">Product risk</label><select id="r-prod" class="input" [(ngModel)]="productRisk" name="productRisk"><option value="">Not stated</option><option value="low">Low</option><option value="medium">Medium</option><option value="high">High</option></select></div>
+          <div><label class="label" for="r-fail">Failed ID checks</label><input id="r-fail" class="input" type="number" min="0" max="20" [(ngModel)]="failed" name="failed"/></div>
+          <div><label class="label" for="r-vol">Expected monthly volume</label><input id="r-vol" class="input" type="number" min="0" [(ngModel)]="volume" name="volume"/></div>
+          <div><label class="label" for="r-layers">Ownership layers</label><input id="r-layers" class="input" type="number" min="0" max="20" [(ngModel)]="layers" name="layers"/></div>
+        </div>
+        <fieldset class="grid grid-cols-2 gap-2 text-sm">
+          <legend class="label">Red flags</legend>
+          <label *ngFor="let t of toggles" class="flex items-center gap-2"><input type="checkbox" [(ngModel)]="flags[t.key]" [name]="t.key"/> {{ t.label }}</label>
+        </fieldset>
+        <button class="btn-primary w-full" type="submit" [disabled]="!canRun || busy()">{{ busy() ? 'Scoring...' : 'Calculate risk' }}</button>
+      </form>
+    </section>
+
+    <div class="space-y-5">
+      <section class="card p-5" *ngIf="result() as r; else hint">
+        <div class="flex items-center justify-between">
+          <div><p class="muted">Risk score</p><p class="text-5xl font-extrabold text-ink-950">{{ r.score }}<span class="text-xl text-ink-400">/100</span></p></div>
+          <span [ngClass]="badge(r.level)" class="text-sm">{{ r.level | titlecase }} risk</span>
+        </div>
+        <div class="h-2 rounded bg-ink-100 mt-3"><div class="h-full rounded" [ngClass]="r.level === 'low' ? 'bg-brand-500' : r.level === 'medium' ? 'bg-amber-500' : 'bg-red-500'" [style.width.%]="r.score"></div></div>
+        <p class="text-sm text-ink-700 mt-4">{{ r.explanation }}</p>
+        <div class="grid sm:grid-cols-2 gap-4 mt-4 text-sm">
+          <div class="bg-ink-50 rounded-lg p-3"><p class="text-ink-500 text-xs">Recommended due diligence</p><p class="font-medium text-ink-900">{{ r.recommendedDueDiligence }}</p></div>
+          <div class="bg-ink-50 rounded-lg p-3"><p class="text-ink-500 text-xs">Review this customer</p><p class="font-medium text-ink-900">every {{ r.reviewFrequencyMonths }} months</p></div>
+        </div>
+        <h3 class="text-sm font-semibold text-ink-800 mt-5 mb-2">What drove the score</h3>
+        <ul class="space-y-2"><li *ngFor="let x of r.factors" class="text-sm">
+          <div class="flex justify-between"><span class="font-medium text-ink-800">{{ x.label }}</span><span class="text-ink-600">+{{ x.points }}</span></div>
+          <p class="text-xs text-ink-500">{{ x.detail }}</p></li>
+          <li *ngIf="!r.factors.length" class="text-sm text-ink-500">No risk factors were found in what you entered.</li></ul>
+        <p class="text-xs text-ink-400 mt-4">Country list: {{ r.countryListVersion }}.</p>
+        <button *ngIf="canRun && (r.level === 'high' || r.level === 'critical')" class="btn-secondary mt-3" [disabled]="busy()" (click)="openCase(r)">Open a case for this customer</button>
+      </section>
+      <ng-template #hint><section class="card p-6 text-sm text-ink-500">Fill in what you know and press "Calculate risk". Leave anything unknown empty.</section></ng-template>
+
+      <section class="card">
+        <div class="p-4 border-b border-ink-100"><h2 class="font-semibold text-ink-900">Your customers, highest risk first</h2>
+          <p class="text-xs text-ink-500">The score each customer received from their onboarding answers.</p></div>
+        <div class="overflow-x-auto"><table class="table">
+          <thead><tr><th>Customer</th><th>Form</th><th>Status</th><th>Risk</th></tr></thead>
+          <tbody>
+            <tr *ngFor="let c of customers()"><td><a [routerLink]="['/app/my-clients', c.id]" class="font-medium text-ink-900 hover:text-brand-700">{{ c.fullName }}</a><div class="text-xs text-ink-400">{{ c.country || '—' }}</div></td>
+              <td class="text-sm">{{ c.formName }}</td><td class="text-sm">{{ c.status.replace('_', ' ') }}</td>
+              <td><span [ngClass]="badge(c.riskLevel)">{{ c.riskLevel | titlecase }}</span> <span class="text-xs text-ink-400">{{ c.riskScore }}</span></td></tr>
+            <tr *ngIf="loaded && !customers().length"><td colspan="4" class="text-center text-sm text-ink-400 py-6">No customers yet.</td></tr>
+          </tbody></table></div>
+      </section>
+    </div>
+  </div>
+  `
 })
-export class CustomerRiskEngineComponent {
-  tab = signal<'profiles' | 'configure'>('profiles');
+export class CustomerRiskEngineComponent implements OnInit {
+  f: RiskScoreRequest = { subjectType: 'individual' };
+  productRisk = '';
+  failed: number | null = null;
+  volume: number | null = null;
+  layers: number | null = null;
+  readonly toggles = [
+    { key: 'pepDeclared', label: 'Says they are a PEP' }, { key: 'pepMatch', label: 'Matched a PEP list' }, { key: 'adverseMedia', label: 'Adverse media found' },
+    { key: 'sanctionsDeclared', label: 'Sanctions exposure declared' }, { key: 'sanctionsHit', label: 'Matched a sanctions list' }, { key: 'nonFaceToFace', label: 'Onboarded remotely' },
+    { key: 'complexOwnership', label: 'Complex ownership' }, { key: 'bearerShares', label: 'Bearer shares' }, { key: 'cashIntensive', label: 'Cash-intensive business' },
+    { key: 'documentsIncomplete', label: 'Documents incomplete' }, { key: 'uboUnknown', label: 'Owner not identified' }
+  ];
+  flags: Record<string, boolean> = {};
+  busy = signal(false);
+  error = signal('');
+  result = signal<RiskScore | null>(null);
+  customers = signal<Customer[]>([]);
+  loaded = false;
 
-  customers: Customer[] = [];
-  loading = true;
-  query = '';
-  levelFilter: 'all' | Customer['riskLevel'] = 'all';
-  selected = signal<Customer | null>(null);
+  constructor(private ai: AiApiService, private auth: AuthService, private compliance: ComplianceApiService, private router: Router) {}
 
-  weights: RiskFactorWeight[] = [];
-  thresholds: RiskTierThreshold[] = [];
-  toast = signal('');
+  get canRun() { return this.auth.hasMinRole(3); }
+  badge(l: string) { return LEVEL_BADGE[l] ?? 'badge-gray'; }
 
-  // Quick simulator inputs (0-100 per inherent factor, plus overall control effectiveness)
-  simInherentInputs: Record<string, number> = {};
-  simControlScore = 60;
-
-  constructor(private data: DataService) {
-    this.data.getCustomers().subscribe(c => { this.customers = c; this.loading = false; });
-    this.data.getRiskFactorWeights().subscribe(w => {
-      this.weights = w;
-      for (const factor of w.filter(x => x.category === 'Inherent')) this.simInherentInputs[factor.id] = 50;
-    });
-    this.data.getRiskTierThresholds().subscribe(t => this.thresholds = t);
-  }
-
-  filtered() {
-    return this.customers.filter(c => {
-      const matchesQuery = !this.query.trim() || c.fullName.toLowerCase().includes(this.query.toLowerCase());
-      const matchesLevel = this.levelFilter === 'all' || c.riskLevel === this.levelFilter;
-      return matchesQuery && matchesLevel;
+  ngOnInit() {
+    this.compliance.customers({ size: 100 }).subscribe({
+      next: p => { this.customers.set([...p.items].sort((a, b) => b.riskScore - a.riskScore).slice(0, 10)); this.loaded = true; },
+      error: () => { this.loaded = true; }
     });
   }
 
-  select(c: Customer) { this.selected.set(c); }
-
-  levelBadge(l: Customer['riskLevel']) {
-    return l === 'high' ? 'badge-red' : l === 'medium' ? 'badge-yellow' : 'badge-green';
+  private body(): RiskScoreRequest {
+    const b: RiskScoreRequest = { ...this.f };
+    for (const k of ['country', 'nationality', 'operatingCountry', 'industry'] as const) if (!b[k]?.trim()) delete b[k]; else b[k] = b[k]!.trim();
+    for (const t of ['pepDeclared', 'pepMatch', 'adverseMedia', 'sanctionsDeclared', 'sanctionsHit', 'nonFaceToFace', 'complexOwnership', 'bearerShares', 'cashIntensive'] as const) if (this.flags[t]) b[t] = true;
+    if (this.flags['documentsIncomplete']) b.documentsComplete = false;
+    if (this.flags['uboUnknown']) b.uboIdentified = false;
+    if (this.productRisk) b.productRisk = this.productRisk as 'low' | 'medium' | 'high';
+    if (this.failed) b.failedVerifications = Number(this.failed);
+    if (this.volume) b.expectedMonthlyVolume = Number(this.volume);
+    if (this.layers) b.ownershipLayers = Number(this.layers);
+    return b;
   }
 
-  countByLevel(l: Customer['riskLevel']) {
-    return this.customers.filter(c => c.riskLevel === l).length;
+  run() {
+    this.busy.set(true);
+    this.error.set('');
+    this.ai.score(this.body()).subscribe({
+      next: r => { this.busy.set(false); this.result.set(r); },
+      error: (e: ApiError) => { this.busy.set(false); this.error.set(e.userMessage); }
+    });
   }
 
-  inherentWeights() { return this.weights.filter(w => w.category === 'Inherent'); }
-  controlWeights() { return this.weights.filter(w => w.category === 'Control'); }
-
-  weightSum(category: 'Inherent' | 'Control') {
-    return this.weights.filter(w => w.category === category).reduce((s, w) => s + w.weight, 0);
-  }
-
-  tierForScore(score: number): RiskTierThreshold['tier'] {
-    const match = this.thresholds.find(t => score >= t.minScore && score <= t.maxScore);
-    return match ? match.tier : 'Very High';
-  }
-
-  tierBadge(tier: string) {
-    return tier === 'Low' ? 'badge-green' : tier === 'Medium' ? 'badge-yellow' : 'badge-red';
-  }
-
-  // Derives a customer's inherent/control/residual breakdown live from the CURRENT weight configuration,
-  // so editing weights in the "Configure" tab immediately changes every customer's computed breakdown.
-  breakdown(c: Customer): CustomerRiskBreakdown {
-    const baseSignal = Math.min(100, Math.round(c.riskScore * 1.15));
-    const rawComponents: Record<string, number> = {
-      'Industry / Product Risk': Math.round(baseSignal * 0.9),
-      'Geography Risk': Math.round(baseSignal * (c.country === 'Nigeria' ? 0.6 : 0.9)),
-      'PEP / Sanctions / Adverse Media': (c.pepHit || c.sanctionsHit) ? 90 : 15,
-      'Transaction Volume & Velocity': Math.round(baseSignal * 0.75),
-      'Channel & Delivery Risk': Math.round(baseSignal * 0.5)
-    };
-    const inherentFactors = this.inherentWeights();
-    const totalInherentWeight = inherentFactors.reduce((s, w) => s + w.weight, 0) || 1;
-    const components = inherentFactors.map(w => ({ label: w.label, score: Math.min(100, rawComponents[w.label] ?? baseSignal), weight: w.weight }));
-    const inherent = Math.round(components.reduce((s, comp) => s + comp.score * (comp.weight / totalInherentWeight), 0));
-
-    const controlFactors = this.controlWeights();
-    const totalControlWeight = controlFactors.reduce((s, w) => s + w.weight, 0) || 1;
-    const controlRaw: Record<string, number> = {
-      'KYC / Ownership Verification': c.sanctionsHit || c.pepHit ? 55 : 85,
-      'Transaction Monitoring Coverage': 80,
-      'Sanctions Screening QA': 88,
-      'EDD Completion Rate': c.riskLevel === 'high' ? 60 : 92
-    };
-    const controlEffectiveness = Math.round(controlFactors.reduce((s, w) => s + (controlRaw[w.label] ?? 75) * (w.weight / totalControlWeight), 0));
-    const residual = Math.round(inherent * (1 - controlEffectiveness / 150));
-
-    return { customerId: c.id, inherentRisk: inherent, controlEffectiveness, residualRisk: Math.max(0, Math.min(100, residual)), components };
-  }
-
-  // ===== Configure weights & thresholds =====
-
-  updateWeight(w: RiskFactorWeight, value: number) {
-    this.data.updateRiskFactorWeight(w.id, value).subscribe(() => this.flash('Weight updated — customer breakdowns recalculated.'));
-  }
-
-  updateThreshold(t: RiskTierThreshold) {
-    this.data.updateRiskTierThreshold(t).subscribe(() => this.flash('Tier threshold updated.'));
-  }
-
-  // ===== Quick simulator =====
-
-  simulatedInherent() {
-    const factors = this.inherentWeights();
-    const total = factors.reduce((s, w) => s + w.weight, 0) || 1;
-    return Math.round(factors.reduce((s, w) => s + (this.simInherentInputs[w.id] ?? 50) * (w.weight / total), 0));
-  }
-
-  simulatedResidual() {
-    const inherent = this.simulatedInherent();
-    return Math.max(0, Math.min(100, Math.round(inherent * (1 - this.simControlScore / 150))));
-  }
-
-  private flash(msg: string) {
-    this.toast.set(msg);
-    setTimeout(() => this.toast.set(''), 2000);
+  openCase(r: RiskScore) {
+    this.busy.set(true);
+    const name = this.f.country ? `${this.f.subjectType === 'business' ? 'Business' : 'Customer'} in ${this.f.country}` : 'High-risk customer';
+    this.ai.createCase({
+      title: `High risk score: ${name}`, subjectType: this.f.subjectType, description: r.explanation,
+      evidence: [{ type: 'risk_score', code: 'RISK_SCORE', severity: r.level === 'critical' ? 'critical' : 'high', description: `Risk score ${r.score}/100 (${r.level}). ${r.factors.map(x => x.label).join('; ')}.` }]
+    }).subscribe({
+      next: c => { this.busy.set(false); this.router.navigate(['/app/cases', c.caseId]); },
+      error: (e: ApiError) => { this.busy.set(false); this.error.set(e.userMessage); }
+    });
   }
 }

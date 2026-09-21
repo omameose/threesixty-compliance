@@ -2,10 +2,10 @@ import { CommonModule } from '@angular/common';
 import { Component, OnInit } from '@angular/core';
 import { RouterLink } from '@angular/router';
 import { ChartConfiguration, ChartData } from 'chart.js';
-import { forkJoin } from 'rxjs';
+import { catchError, forkJoin, of, switchMap } from 'rxjs';
 import { ApiError } from '../../core/http/api.service';
 import { ComplianceApiService } from '../../core/services/compliance-api.service';
-import { DataService } from '../../core/services/data.service';
+import { AiApiService, CaseStats, PortfolioInsights } from '../../core/services/ai-api.service';
 import { DashboardStats } from '../../core/models/models';
 import { StatCardComponent } from '../../shared/components/stat-card/stat-card.component';
 import { PageHeaderComponent } from '../../shared/components/page-header/page-header.component';
@@ -51,18 +51,10 @@ export class DashboardHomeComponent implements OnInit {
     scales: { x: { grid: { color: '#f0f2f4' } }, y: { grid: { display: false } } }
   };
 
-  // ===== Compliance & Risk Intelligence =====
+  // ===== Compliance & Risk Intelligence (real cases and customers) =====
   intelLoading = true;
-  openAlertsCount = 0;
-  criticalAlertsCount = 0;
-  activeInvestigations = 0;
-  sanctionsMatches = 0;
-  pepMatches = 0;
-  adverseMediaFlags = 0;
-  tmsEscalated = 0;
-  fraudEscalated = 0;
-  modelsInReview = 0;
-  avgModelPrecision = 0;
+  cases: CaseStats | null = null;
+  portfolio: PortfolioInsights | null = null;
 
   alertSeverityChartData: ChartData<'bar'> = { labels: [], datasets: [] };
   alertSeverityChartOptions: ChartConfiguration<'bar'>['options'] = {
@@ -71,16 +63,9 @@ export class DashboardHomeComponent implements OnInit {
     scales: { x: { grid: { color: '#f0f2f4' }, beginAtZero: true }, y: { grid: { display: false } } }
   };
 
-  screeningChartData: ChartData<'bar'> = { labels: [], datasets: [] };
-  screeningChartOptions: ChartConfiguration<'bar'>['options'] = {
-    responsive: true, maintainAspectRatio: false,
-    plugins: { legend: { position: 'bottom', labels: { usePointStyle: true, boxWidth: 8, font: { size: 11 } } } },
-    scales: { x: { grid: { display: false } }, y: { beginAtZero: true, grid: { color: '#f0f2f4' } } }
-  };
-
   statsError = '';
 
-  constructor(private data: DataService, private api: ComplianceApiService) {}
+  constructor(private api: ComplianceApiService, private ai: AiApiService) {}
 
   ngOnInit() {
     this.loadIntelligence();
@@ -109,44 +94,30 @@ export class DashboardHomeComponent implements OnInit {
     } });
   }
 
+  topCountries(): string {
+    return (this.portfolio?.topCountries ?? []).slice(0, 4).map(c => `${c.country} (${c.count})`).join(', ');
+  }
+
+  /** Cases and a portfolio summary. Each is skipped quietly when the person's role does not allow it. */
   private loadIntelligence() {
     forkJoin({
-      alerts: this.data.getAlerts(),
-      cases: this.data.getCases(),
-      sanctions: this.data.getSanctionsCases(),
-      pep: this.data.getPepCases(),
-      adverseMedia: this.data.getAdverseMediaCases(),
-      tms: this.data.getTmsHits(),
-      fraud: this.data.getFraudHits(),
-      models: this.data.getModels()
-    }).subscribe(({ alerts, cases, sanctions, pep, adverseMedia, tms, fraud, models }) => {
-      this.openAlertsCount = alerts.filter(a => a.status !== 'closed').length;
-      this.criticalAlertsCount = alerts.filter(a => a.severity === 'critical' || a.severity === 'high').length;
-      this.activeInvestigations = cases.filter(c => c.status !== 'closed').length;
-      this.sanctionsMatches = sanctions.filter(s => s.verdict === 'MATCH').length;
-      this.pepMatches = pep.filter(p => p.verdict === 'PEP_MATCH').length;
-      this.adverseMediaFlags = adverseMedia.filter(a => a.verdict === 'POTENTIAL_RISK').length;
-      this.tmsEscalated = tms.filter(t => t.status === 'escalated').length;
-      this.fraudEscalated = fraud.filter(f => f.status === 'escalated').length;
-      this.modelsInReview = models.filter(m => m.status === 'in_review').length;
-      this.avgModelPrecision = models.length ? Math.round((models.reduce((s, m) => s + m.precision, 0) / models.length) * 100) : 0;
-
-      const bySeverity = { low: 0, medium: 0, high: 0, critical: 0 };
-      for (const a of alerts) bySeverity[a.severity]++;
-      this.alertSeverityChartData = {
-        labels: ['Critical', 'High', 'Medium', 'Low'],
-        datasets: [{ data: [bySeverity.critical, bySeverity.high, bySeverity.medium, bySeverity.low], backgroundColor: ['#ef4444', '#f59e0b', '#3b82f6', '#1fae62'], borderRadius: 6, maxBarThickness: 20 }]
-      };
-
-      this.screeningChartData = {
-        labels: ['Sanctions', 'PEP', 'Adverse Media'],
-        datasets: [
-          { data: [sanctions.filter(s => s.verdict === 'CLEAR').length, pep.filter(p => p.verdict === 'CLEAR').length, adverseMedia.filter(a => a.verdict === 'CLEAR').length], label: 'Clear', backgroundColor: '#1fae62', borderRadius: 6, maxBarThickness: 22 },
-          { data: [sanctions.filter(s => s.verdict === 'POTENTIAL_MATCH').length, pep.filter(p => p.verdict === 'POTENTIAL_PEP').length, adverseMedia.filter(a => a.verdict === 'POTENTIAL_RISK').length], label: 'Potential', backgroundColor: '#f59e0b', borderRadius: 6, maxBarThickness: 22 },
-          { data: [sanctions.filter(s => s.verdict === 'MATCH').length, pep.filter(p => p.verdict === 'PEP_MATCH').length, 0], label: 'Match', backgroundColor: '#ef4444', borderRadius: 6, maxBarThickness: 22 }
-        ]
-      };
-
+      cases: this.ai.caseStats().pipe(catchError(() => of(null))),
+      portfolio: this.api.customers({ size: 200 }).pipe(
+        switchMap(p => p.items.length ? this.ai.portfolio(p.items.map(c => ({
+          status: c.status, riskLevel: c.riskLevel, country: c.country || undefined, formName: c.formName,
+          reviewDays: c.completedAt ? Math.max(0, (Date.parse(c.completedAt) - Date.parse(c.startedAt)) / 86_400_000) : undefined
+        }))) : of(null)),
+        catchError(() => of(null)))
+    }).subscribe(({ cases, portfolio }) => {
+      this.cases = cases;
+      this.portfolio = portfolio;
+      if (cases) {
+        const s = cases.bySeverity;
+        this.alertSeverityChartData = {
+          labels: ['Critical', 'High', 'Medium', 'Low'],
+          datasets: [{ data: [s['critical'] || 0, s['high'] || 0, s['medium'] || 0, s['low'] || 0], backgroundColor: ['#ef4444', '#f59e0b', '#3b82f6', '#1fae62'], borderRadius: 6, maxBarThickness: 20 }]
+        };
+      }
       this.intelLoading = false;
     });
   }

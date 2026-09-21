@@ -5,7 +5,7 @@ import { RouterLink } from '@angular/router';
 import { CdkDragDrop, DragDropModule, moveItemInArray, transferArrayItem } from '@angular/cdk/drag-drop';
 import { ApiError } from '../../../core/http/api.service';
 import { ComplianceApiService, LinkView, toForm } from '../../../core/services/compliance-api.service';
-import { DataService } from '../../../core/services/data.service';
+import { AiApiService } from '../../../core/services/ai-api.service';
 import { ComplianceForm, Customer, CustomerStatus } from '../../../core/models/models';
 
 type ScanType = 'sanctions' | 'pep' | 'adverse-media';
@@ -68,7 +68,7 @@ export class MyClientsListComponent implements OnInit {
   creating = signal(false);
   copied = signal(false);
 
-  constructor(private data: DataService, private api: ComplianceApiService) {}
+  constructor(private ai: AiApiService, private api: ComplianceApiService) {}
 
   ngOnInit() {
     this.api.forms().subscribe({
@@ -259,26 +259,19 @@ export class MyClientsListComponent implements OnInit {
     this.scanMenuOpenFor.update(current => current === customerId ? null : customerId);
   }
 
+  /** A quick screening of one customer's name against the loaded watchlist (a demonstration list unless a real one is configured). */
   runQuickScan(customer: Customer, type: ScanType) {
     this.scanMenuOpenFor.set(null);
     if (this.scanRunningFor()) return;
     this.scanRunningFor.set(customer.id);
-
-    const dob = customer.answers.find(a => a.label === 'Date of Birth')?.value;
-    const onDone = (label: string, verdict: string) => {
-      this.scanRunningFor.set(null);
-      this.flash(`${label} for ${customer.fullName} complete — result: ${verdict.replace('_', ' ')}.`);
-    };
-
-    if (type === 'sanctions') {
-      this.data.runSanctionsScreening({ subjectName: customer.fullName, subjectType: 'Individual', dob, nationality: customer.country, country: customer.country, identifiers: [customer.complianceId], customerId: customer.id })
-        .subscribe(result => onDone('Sanctions Screening', result.verdict));
-    } else if (type === 'pep') {
-      this.data.runPepScreening({ subjectName: customer.fullName, customerId: customer.id })
-        .subscribe(result => onDone('PEP Screening', result.verdict));
-    } else {
-      this.data.runAdverseMediaScreening({ subjectName: customer.fullName, customerId: customer.id })
-        .subscribe(result => onDone('Adverse Media Screening', result.verdict));
-    }
+    const kind = type === 'sanctions' ? 'sanction' : type === 'pep' ? 'pep' : 'adverse_media';
+    const label = type === 'sanctions' ? 'Sanctions screening' : type === 'pep' ? 'PEP screening' : 'Adverse media screening';
+    this.ai.screen({ name: customer.fullName, country: customer.country || undefined, threshold: 0.85, types: [kind] }).subscribe({
+      next: r => {
+        this.scanRunningFor.set(null);
+        this.flash(`${label} for ${customer.fullName}: ${r.hitCount ? r.hitCount + ' possible match(es)' : 'no match'}${r.sampleData ? ' (demonstration list)' : ''}.`);
+      },
+      error: (e: ApiError) => { this.scanRunningFor.set(null); this.error.set(e.userMessage); }
+    });
   }
 }

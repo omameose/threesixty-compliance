@@ -1,74 +1,66 @@
 import { CommonModule } from '@angular/common';
-import { Component, signal } from '@angular/core';
-import { FormsModule } from '@angular/forms';
-import { Router, RouterLink } from '@angular/router';
-import { DataService } from '../../../core/services/data.service';
-import { Alert, AlertStatus } from '../../../core/models/models';
+import { Component, OnInit, signal } from '@angular/core';
+import { RouterLink } from '@angular/router';
+import { Alert, AlertSeverity, OverviewService, Snapshot } from '../../../core/services/overview.service';
 import { PageHeaderComponent } from '../../../shared/components/page-header/page-header.component';
-import { IconComponent } from '../../../shared/components/icon/icon.component';
-import { AvatarComponent } from '../../../shared/components/avatar/avatar.component';
-import { EmptyStateComponent } from '../../../shared/components/empty-state/empty-state.component';
 
+const BADGE: Record<AlertSeverity, string> = { critical: 'badge-red', high: 'badge-red', medium: 'badge-yellow', low: 'badge-gray' };
+
+/**
+ * Things that need attention, worked out from the company's own records: open cases, screening changes and overdue re-screening,
+ * customers waiting for a decision, due diligence waiting for approval, and calendar deadlines. There is nothing to acknowledge here:
+ * an alert goes away when the cause is dealt with, and the link takes you to where that is done.
+ */
 @Component({
   selector: 'app-alert-list',
   standalone: true,
-  imports: [CommonModule, FormsModule, RouterLink, PageHeaderComponent, IconComponent, AvatarComponent, EmptyStateComponent],
-  templateUrl: './alert-list.component.html'
+  imports: [CommonModule, RouterLink, PageHeaderComponent],
+  template: `
+  <app-page-header title="Alerts" subtitle="What needs attention right now. Each alert clears itself when the cause is dealt with."></app-page-header>
+
+  <div *ngIf="snapshot()?.unavailable?.length" class="mb-4 p-3 rounded-lg bg-amber-50 text-amber-800 text-sm" role="note">
+    Not included because your role cannot read them, or they could not be loaded: {{ snapshot()!.unavailable.join(', ') }}.
+  </div>
+
+  <div class="flex flex-wrap items-center gap-1 bg-ink-100 rounded-lg p-1 w-fit mb-5">
+    <button *ngFor="let f of filters" class="px-3 py-1.5 rounded-md text-sm font-medium whitespace-nowrap" [class.bg-white]="filter() === f.key" [class.shadow-sm]="filter() === f.key" (click)="filter.set(f.key)">
+      {{ f.label }} <span class="text-ink-400">{{ countOf(f.key) }}</span>
+    </button>
+  </div>
+
+  <div class="card overflow-x-auto" *ngIf="!loading() && visible().length">
+    <table class="table" aria-label="Alerts">
+      <thead><tr><th>Severity</th><th>Source</th><th>What</th><th></th></tr></thead>
+      <tbody>
+        <tr *ngFor="let a of visible()">
+          <td><span [ngClass]="badge(a.severity)">{{ a.severity }}</span></td>
+          <td><span class="badge-blue">{{ a.source }}</span></td>
+          <td><p class="font-medium text-ink-900">{{ a.title }}</p><p class="text-sm text-ink-500">{{ a.detail }}</p></td>
+          <td class="text-right"><a class="btn-secondary btn-sm" [routerLink]="a.link">Open</a></td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+  <div class="card p-10 text-center text-sm text-ink-500" *ngIf="!loading() && !visible().length">Nothing needs attention{{ filter() === 'all' ? '' : ' in this view' }}.</div>
+  <p *ngIf="loading()" class="py-16 text-center text-ink-400">Loading...</p>
+  `
 })
-export class AlertListComponent {
-  alerts: Alert[] = [];
-  loading = true;
-  statusFilter: 'all' | AlertStatus = 'all';
-  toastMessage = signal('');
+export class AlertListComponent implements OnInit {
+  snapshot = signal<Snapshot | null>(null);
+  all = signal<Alert[]>([]);
+  loading = signal(true);
+  filter = signal<'all' | AlertSeverity>('all');
+  filters: { key: 'all' | AlertSeverity; label: string }[] = [
+    { key: 'all', label: 'All' }, { key: 'critical', label: 'Critical' }, { key: 'high', label: 'High' }, { key: 'medium', label: 'Medium' }, { key: 'low', label: 'Low' }
+  ];
 
-  constructor(private data: DataService, private router: Router) {
-    this.data.getAlerts().subscribe(a => { this.alerts = a; this.loading = false; });
+  constructor(private overview: OverviewService) {}
+
+  ngOnInit() {
+    this.overview.load().subscribe(s => { this.snapshot.set(s); this.all.set(this.overview.alerts(s)); this.loading.set(false); });
   }
 
-  filtered() {
-    return this.statusFilter === 'all' ? this.alerts : this.alerts.filter(a => a.status === this.statusFilter);
-  }
-
-  severityBadge(s: Alert['severity']) {
-    return s === 'critical' ? 'badge-red' : s === 'high' ? 'badge-red' : s === 'medium' ? 'badge-yellow' : 'badge-gray';
-  }
-
-  statusBadge(s: AlertStatus) {
-    return s === 'closed' ? 'badge-green' : s === 'escalated' ? 'badge-red' : s === 'investigating' ? 'badge-blue' : s === 'assigned' ? 'badge-yellow' : 'badge-gray';
-  }
-
-  assignToMe(alert: Alert) {
-    this.data.updateAlertStatus(alert.id, 'assigned', 'Rukayat Yaro').subscribe(() => {
-      this.alerts = this.alerts.map(a => a.id === alert.id ? { ...a, status: 'assigned', assignedTo: 'Rukayat Yaro' } : a);
-      this.notify('Alert assigned to you.');
-    });
-  }
-
-  escalate(alert: Alert) {
-    this.data.updateAlertStatus(alert.id, 'escalated').subscribe(() => {
-      this.alerts = this.alerts.map(a => a.id === alert.id ? { ...a, status: 'escalated' } : a);
-      this.notify('Alert escalated.');
-    });
-  }
-
-  close(alert: Alert) {
-    this.data.updateAlertStatus(alert.id, 'closed').subscribe(() => {
-      this.alerts = this.alerts.map(a => a.id === alert.id ? { ...a, status: 'closed' } : a);
-      this.notify('Alert closed.');
-    });
-  }
-
-  convertToCase(alert: Alert) {
-    this.data.convertAlertToCase(alert.id).subscribe(res => {
-      if (res.success) {
-        this.notify('Case opened from alert.');
-        this.router.navigate(['/app/cases', res.caseId]);
-      }
-    });
-  }
-
-  private notify(msg: string) {
-    this.toastMessage.set(msg);
-    setTimeout(() => this.toastMessage.set(''), 2500);
-  }
+  badge(s: AlertSeverity) { return BADGE[s]; }
+  visible() { return this.filter() === 'all' ? this.all() : this.all().filter(a => a.severity === this.filter()); }
+  countOf(k: 'all' | AlertSeverity) { return k === 'all' ? this.all().length : this.all().filter(a => a.severity === k).length; }
 }

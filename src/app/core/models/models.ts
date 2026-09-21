@@ -225,6 +225,7 @@ export interface Customer {
   sanctionsHit: boolean;
   pepHit: boolean;
   /** Only on the detail call. */
+  verifications?: { type: string; status: string; matchScore?: number | null }[];
   decisionReason?: string;
   moreInfoMessage?: string;
 }

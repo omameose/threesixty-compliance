@@ -126,7 +126,9 @@ export class DashboardLayoutComponent {
 
   /** Screens whose data comes from the real backend. Anything else still shows built-in sample data and says so. */
   private static readonly LIVE = ['/app/dashboard', '/app/templates', '/app/form-builder', '/app/my-compliance', '/app/my-clients', '/app/subscription',
-    '/app/teams', '/app/settings', '/app/profile', '/app/developer-console', '/app/verification-kyc'];
+    '/app/teams', '/app/settings', '/app/profile', '/app/developer-console', '/app/verification-kyc',
+    '/app/verification', '/app/screening', '/app/cases', '/app/str-sar', '/app/detection/risk-engine', '/app/detection/transaction-monitoring', '/app/compliance-programme',
+    '/app/alerts', '/app/cdd', '/app/edd', '/app/continuous-monitoring', '/app/audit-trail', '/app/regulatory-calendar', '/app/board-dashboard', '/app/war-room', '/app/ctr-itr'];
 
   showingSampleData(): boolean {
     const url = this.router.url;
